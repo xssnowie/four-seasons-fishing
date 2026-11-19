@@ -91,7 +91,7 @@
   // 旋律写法：[MIDI 音高 或 null(休止), 时值(八分音符个数)]，每小节加起来 = 8。和弦：每小节 1–2 个 [根音 MIDI, 'M'|'m']。
   const SONGS = {
     spring: { // C 大调，柔和笛声 + 四分音符分解和弦，摇篮曲式级进
-      bpm: 84, lead: 'softflute', comp: 'broken', perc: null, soft: true,
+      bpm: 84, lead: 'softflute', comp: 'broken', perc: null, soft: true, lp: 1300, wet: 0.3,
       chords: [[[60, 'M']], [[57, 'm']], [[53, 'M']], [[55, 'M']], [[60, 'M']], [[57, 'm']], [[50, 'm'], [55, 'M']], [[60, 'M']]],
       melody: [[76, 3], [74, 1], [72, 2], [74, 2], [76, 4], [69, 2], [72, 2], [77, 3], [76, 1], [74, 2], [72, 2], [74, 6], [null, 2],
         [76, 3], [77, 1], [79, 2], [76, 2], [81, 3], [79, 1], [76, 2], [72, 2], [74, 2], [77, 2], [76, 2], [74, 2], [72, 6], [null, 2]],
@@ -103,16 +103,18 @@
         [76, 2], [79, 2], [84, 3], [null, 1], [81, 1], [81, 1], [84, 2], [81, 1], [79, 1], [77, 2], [77, 2], [81, 2], [86, 3], [84, 1], [82, 2], [81, 2], [79, 2], [76, 2], [77, 6], [null, 2]],
     },
     autumn: { // A 小调，温暖长音 + 稀疏琶音
-      bpm: 72, lead: 'warm', comp: 'arp', perc: null, soft: true,
+      bpm: 72, lead: 'warm', comp: 'arp', perc: null, soft: true, lp: 1300, wet: 0.3,
       chords: [[[57, 'm']], [[53, 'M']], [[60, 'M']], [[55, 'M']], [[57, 'm']], [[50, 'm']], [[52, 'M']], [[57, 'm']]],
       melody: [[72, 2], [71, 2], [69, 4], [69, 2], [72, 2], [77, 4], [76, 3], [74, 1], [72, 2], [76, 2], [74, 6], [null, 2],
         [72, 2], [74, 2], [76, 4], [77, 3], [76, 1], [74, 4], [71, 2], [74, 2], [72, 2], [71, 2], [69, 6], [null, 2]],
     },
-    winter: { // E 小调，轻柔八音盒 + 慢起长音铺底
-      bpm: 60, lead: 'musicbox', comp: 'pad', perc: null, soft: true,
-      chords: [[[52, 'm']], [[48, 'M']], [[55, 'M']], [[50, 'M']], [[52, 'm']], [[48, 'M']], [[57, 'm']], [[59, 'M']]],
-      melody: [[71, 2], [76, 2], [79, 4], [76, 4], [74, 2], [72, 2], [71, 4], [74, 4], [74, 4], [69, 4],
-        [79, 3], [78, 1], [76, 4], [79, 2], [76, 2], [72, 4], [69, 2], [72, 2], [76, 2], [72, 2], [75, 4], [71, 4]],
+    winter: { // D 大调，钟琴 + 跳跃反拍和弦 + 雪橇铃 + 拨弦跳低音，欢快的冬天
+      bpm: 116, lead: 'glock', comp: 'offbeat', perc: 'sleigh', bounceBass: true, soft: true, lp: 3800, wet: 0.18,
+      chords: [[[62, 'M']], [[59, 'm']], [[55, 'M']], [[57, 'M']], [[62, 'M']], [[59, 'm']], [[52, 'm'], [57, 'M']], [[62, 'M']]],
+      melody: [[78, 1], [81, 1], [86, 2], [81, 1], [78, 1], [81, 2], [83, 2], [86, 1], [83, 1], [78, 2], [null, 2],
+        [79, 1], [83, 1], [86, 2], [88, 1], [86, 1], [83, 2], [81, 3], [79, 1], [78, 2], [76, 2],
+        [78, 1], [81, 1], [86, 2], [90, 2], [88, 2], [86, 1], [85, 1], [83, 2], [86, 2], [83, 2],
+        [79, 2], [83, 2], [81, 2], [85, 2], [86, 6], [null, 2]],
     },
   };
   const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -120,8 +122,9 @@
 
   function instrument(kind, midi, dur, at, vol) {
     const f = mf(midi), o = { at, bus: mbus };
-    if (kind === 'softflute') { tone(f, dur * 1.25, Object.assign({ type: 'sine', vol: vol, attack: 0.09 }, o)); tone(f, dur, Object.assign({ type: 'triangle', vol: vol * 0.12, attack: 0.12 }, o)); }
-    else if (kind === 'warm') { tone(f, dur + 0.5, Object.assign({ type: 'sine', vol: vol, attack: 0.04 }, o)); tone(f / 2, dur + 0.3, Object.assign({ type: 'triangle', vol: vol * 0.15, attack: 0.06 }, o)); }
+    if (kind === 'softflute') { tone(f, dur * 1.3, Object.assign({ type: 'sine', vol: vol * 0.85, attack: 0.16 }, o)); tone(f / 2, dur * 1.2, Object.assign({ type: 'sine', vol: vol * 0.12, attack: 0.2 }, o)); }
+    else if (kind === 'warm') { tone(f, dur + 0.6, Object.assign({ type: 'sine', vol: vol * 0.85, attack: 0.1 }, o)); tone(f / 2, dur + 0.4, Object.assign({ type: 'sine', vol: vol * 0.15, attack: 0.14 }, o)); }
+    else if (kind === 'glock') { tone(f, 0.9, Object.assign({ type: 'sine', vol: vol, attack: 0.003 }, o)); tone(f * 4, 0.25, Object.assign({ type: 'sine', vol: vol * 0.12, attack: 0.002 }, o)); tone(f * 2, 0.4, Object.assign({ type: 'triangle', vol: vol * 0.08, attack: 0.003 }, o)); }
     else if (kind === 'flute') { tone(f, dur, Object.assign({ type: 'triangle', vol: vol, attack: 0.04 }, o)); tone(f * 2, dur * 0.8, Object.assign({ type: 'sine', vol: vol * 0.15, attack: 0.05 }, o)); }
     else if (kind === 'marimba') { tone(f, Math.min(dur, 0.45), Object.assign({ type: 'sine', vol: vol, attack: 0.003 }, o)); tone(f * 4, 0.08, Object.assign({ type: 'sine', vol: vol * 0.25, attack: 0.002 }, o)); }
     else if (kind === 'pluck') { tone(f, Math.min(dur + 0.3, 1.1), Object.assign({ type: 'triangle', vol: vol, attack: 0.004 }, o)); tone(f * 2, 0.25, Object.assign({ type: 'sine', vol: vol * 0.2, attack: 0.003 }, o)); }
@@ -143,15 +146,15 @@
   }
 
   // 柔和处理：低通削高频 + 一点回声，给春 / 秋 / 冬用
-  let softBus = null, mbus = null;
+  let softBus = null, softWet = null, mbus = null;
   function getSoftBus() {
     if (softBus) return softBus;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2000; lp.Q.value = 0.5;
-    const dl = ctx.createDelay(1); dl.delayTime.value = 0.32;
+    const dl = ctx.createDelay(1); dl.delayTime.value = 0.34;
     const fb = ctx.createGain(); fb.gain.value = 0.28;
     const wet = ctx.createGain(); wet.gain.value = 0.22;
     lp.connect(musicBus); lp.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(musicBus);
-    softBus = lp; return softBus;
+    softBus = lp; softWet = wet; return softBus;
   }
 
   let music = null;
@@ -160,6 +163,7 @@
     stopMusic();
     const song = SONGS[season] || SONGS.spring, ev = compile(song);
     mbus = song.soft ? getSoftBus() : musicBus;
+    if (song.soft) { softBus.frequency.setValueAtTime(song.lp || 2000, ctx.currentTime); softWet.gain.setValueAtTime(song.wet == null ? 0.22 : song.wet, ctx.currentTime); }
     const eighth = 60 / song.bpm / 2;
     let step = 0, loop = 0, next = ctx.currentTime + 0.15;
     const timer = setInterval(() => {
@@ -167,27 +171,29 @@
         const at = next - ctx.currentTime, restLoop = loop % 3 === 2; // 每 3 遍有 1 遍只留伴奏
         ev[step].forEach(e => {
           if (e.part === 'lead' && !restLoop) instrument(song.lead, e.m, e.len * eighth * 0.95, at, song.lead === 'musicbox' ? 0.22 : 0.2);
-          else if (e.part === 'bass') tone(mf(e.m), Math.min(e.len * eighth, 1.6), { type: 'sine', vol: song.soft ? 0.2 : 0.3, at, bus: mbus, attack: song.soft ? 0.08 : 0.02 });
+          else if (e.part === 'bass' && !song.bounceBass) tone(mf(e.m), Math.min(e.len * eighth, 1.6), { type: 'sine', vol: song.soft ? 0.16 : 0.3, at, bus: mbus, attack: song.soft ? 0.12 : 0.02 });
           else if (e.part === 'comp') {
             const [a, b, c] = e.notes;
-            if (song.comp === 'broken') { if (e.k % 2 === 0) { const seq = [a, c, b + 12, c]; tone(mf(seq[(e.k / 2) % 4] + 12), eighth * 3, { type: 'sine', vol: 0.045, at, bus: mbus, attack: 0.03 }); } }
-            else if (song.comp === 'arp') { if (e.k % 2 === 0) { const seq = [a, c, a + 12, c]; instrument('warm', seq[(e.k / 2) % 4], eighth * 1.5, at, 0.045); } }
-            else if (song.comp === 'offbeat') { if (e.k % 2 === 1) [a, b, c].forEach(m => tone(mf(m + 12), eighth * 0.6, { type: 'triangle', vol: 0.045, at, bus: mbus, attack: 0.005 })); }
+            if (song.bounceBass && e.k % 4 === 0) tone(mf((e.k === 0 ? a : c) - 12), eighth * 1.4, { type: 'triangle', vol: 0.22, at, bus: mbus, attack: 0.005 });
+            if (song.comp === 'broken') { if (e.k % 2 === 0) { const seq = [a, c, b + 12, c]; tone(mf(seq[(e.k / 2) % 4] + 12), eighth * 3, { type: 'sine', vol: 0.035, at, bus: mbus, attack: 0.06 }); } }
+            else if (song.comp === 'arp') { if (e.k % 2 === 0) { const seq = [a, c, a + 12, c]; instrument('warm', seq[(e.k / 2) % 4], eighth * 1.5, at, 0.035); } }
+            else if (song.comp === 'offbeat') { if (e.k % 2 === 1) [a, b, c].forEach(m => tone(mf(m + 12), eighth * 0.6, { type: song.soft ? 'sine' : 'triangle', vol: song.soft ? 0.05 : 0.045, at, bus: mbus, attack: 0.005 })); }
             else if (song.comp === 'pad' && e.k === 0) [a, b, c].forEach(m => tone(mf(m + 12), e.span * eighth * 1.1, { type: 'sine', vol: 0.045, at, bus: mbus, attack: 0.8 }));
           }
         });
         if (song.perc === 'shaker' || (song.perc === 'offbeat' && step % 2 === 1)) hissMusic(at, step % 2 ? 0.05 : 0.03);
+        if (song.perc === 'sleigh') { hissMusic(at, step % 2 ? 0.035 : 0.06, 9000, 0.09); if (step % 4 === 2) hissMusic(at + eighth / 2, 0.025, 9000, 0.06); }
         step++; next += eighth;
         if (step === 64) { step = 0; loop++; }
       }
     }, 100);
     music = { timer };
   }
-  function hissMusic(at, vol) { // 轻沙锤
+  function hissMusic(at, vol, hp, len) { // 轻沙锤 / 雪橇铃
     const t = ctx.currentTime + at, s = ctx.createBufferSource(); s.buffer = noise();
-    const fl = ctx.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = 6000;
-    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
-    s.connect(fl); fl.connect(g); g.connect(mbus); s.start(t); s.stop(t + 0.08);
+    const fl = ctx.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = hp || 6000;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (len || 0.06));
+    s.connect(fl); fl.connect(g); g.connect(mbus); s.start(t); s.stop(t + (len || 0.06) + 0.02);
   }
   function stopMusic() { if (music) { clearInterval(music.timer); music = null; } }
 
