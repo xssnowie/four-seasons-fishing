@@ -108,13 +108,13 @@
       melody: [[72, 2], [71, 2], [69, 4], [69, 2], [72, 2], [77, 4], [76, 3], [74, 1], [72, 2], [76, 2], [74, 6], [null, 2],
         [72, 2], [74, 2], [76, 4], [77, 3], [76, 1], [74, 4], [71, 2], [74, 2], [72, 2], [71, 2], [69, 6], [null, 2]],
     },
-    winter: { // D 大调，钟琴 + 跳跃反拍和弦 + 雪橇铃 + 拨弦跳低音，欢快的冬天
-      bpm: 116, lead: 'glock', comp: 'offbeat', perc: 'sleigh', bounceBass: true, soft: true, lp: 3800, wet: 0.18,
-      chords: [[[62, 'M']], [[59, 'm']], [[55, 'M']], [[57, 'M']], [[62, 'M']], [[59, 'm']], [[52, 'm'], [57, 'M']], [[62, 'M']]],
-      melody: [[78, 1], [81, 1], [86, 2], [81, 1], [78, 1], [81, 2], [83, 2], [86, 1], [83, 1], [78, 2], [null, 2],
-        [79, 1], [83, 1], [86, 2], [88, 1], [86, 1], [83, 2], [81, 3], [79, 1], [78, 2], [76, 2],
-        [78, 1], [81, 1], [86, 2], [90, 2], [88, 2], [86, 1], [85, 1], [83, 2], [86, 2], [83, 2],
-        [79, 2], [83, 2], [81, 2], [85, 2], [86, 6], [null, 2]],
+    winter: { // D 大调 I–IV–V，钟琴跳音 + 摇摆节奏 + 嘭恰低音 + 拍手 + 雪橇铃，热闹的冬天
+      bpm: 132, swing: 0.22, lead: 'glock', comp: 'offbeat', perc: 'sleigh', bounceBass: true, soft: true, lp: 7000, wet: 0.12,
+      chords: [[[62, 'M']], [[55, 'M']], [[57, 'M']], [[62, 'M']], [[62, 'M']], [[55, 'M']], [[57, 'M']], [[62, 'M']]],
+      melody: [[81, 1], [81, 1], [78, 1], [81, 1], [86, 2], [81, 2], [83, 1], [83, 1], [79, 1], [83, 1], [86, 2], [83, 2],
+        [85, 1], [86, 1], [88, 1], [85, 1], [81, 2], [88, 2], [90, 2], [88, 1], [86, 1], [81, 2], [null, 2],
+        [86, 1], [88, 1], [90, 1], [86, 1], [81, 1], [78, 1], [81, 2], [79, 1], [83, 1], [86, 1], [91, 1], [90, 2], [88, 2],
+        [88, 1], [90, 1], [88, 1], [85, 1], [81, 1], [83, 1], [85, 2], [86, 2], [81, 1], [78, 1], [86, 2], [null, 2]],
     },
   };
   const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -168,13 +168,13 @@
     let step = 0, loop = 0, next = ctx.currentTime + 0.15;
     const timer = setInterval(() => {
       while (next < ctx.currentTime + 0.3) {
-        const at = next - ctx.currentTime, restLoop = loop % 3 === 2; // 每 3 遍有 1 遍只留伴奏
+        const at = next - ctx.currentTime + (song.swing && step % 2 ? song.swing * eighth : 0), restLoop = loop % 3 === 2; // 每 3 遍有 1 遍只留伴奏；swing = 后半拍稍拖
         ev[step].forEach(e => {
           if (e.part === 'lead' && !restLoop) instrument(song.lead, e.m, e.len * eighth * 0.95, at, song.lead === 'musicbox' ? 0.22 : 0.2);
           else if (e.part === 'bass' && !song.bounceBass) tone(mf(e.m), Math.min(e.len * eighth, 1.6), { type: 'sine', vol: song.soft ? 0.16 : 0.3, at, bus: mbus, attack: song.soft ? 0.12 : 0.02 });
           else if (e.part === 'comp') {
             const [a, b, c] = e.notes;
-            if (song.bounceBass && e.k % 4 === 0) tone(mf((e.k === 0 ? a : c) - 12), eighth * 1.4, { type: 'triangle', vol: 0.22, at, bus: mbus, attack: 0.005 });
+            if (song.bounceBass && e.k % 2 === 0) tone(mf(((e.k / 2) % 2 === 0 ? a : c) - 12), eighth * 0.9, { type: 'triangle', vol: 0.24, at, bus: mbus, attack: 0.004 });
             if (song.comp === 'broken') { if (e.k % 2 === 0) { const seq = [a, c, b + 12, c]; tone(mf(seq[(e.k / 2) % 4] + 12), eighth * 3, { type: 'sine', vol: 0.035, at, bus: mbus, attack: 0.06 }); } }
             else if (song.comp === 'arp') { if (e.k % 2 === 0) { const seq = [a, c, a + 12, c]; instrument('warm', seq[(e.k / 2) % 4], eighth * 1.5, at, 0.035); } }
             else if (song.comp === 'offbeat') { if (e.k % 2 === 1) [a, b, c].forEach(m => tone(mf(m + 12), eighth * 0.6, { type: song.soft ? 'sine' : 'triangle', vol: song.soft ? 0.05 : 0.045, at, bus: mbus, attack: 0.005 })); }
@@ -182,12 +182,20 @@
           }
         });
         if (song.perc === 'shaker' || (song.perc === 'offbeat' && step % 2 === 1)) hissMusic(at, step % 2 ? 0.05 : 0.03);
-        if (song.perc === 'sleigh') { hissMusic(at, step % 2 ? 0.035 : 0.06, 9000, 0.09); if (step % 4 === 2) hissMusic(at + eighth / 2, 0.025, 9000, 0.06); }
+        if (song.perc === 'sleigh') { hissMusic(at, step % 2 ? 0.045 : 0.07, 8500, 0.09); if (step % 4 === 2) clap(at); }
         step++; next += eighth;
         if (step === 64) { step = 0; loop++; }
       }
     }, 100);
     music = { timer };
+  }
+  function clap(at) { // 轻拍手：带通噪声，两下叠成「啪」
+    [0, 0.012].forEach(d => {
+      const t = ctx.currentTime + at + d, s = ctx.createBufferSource(); s.buffer = noise();
+      const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 1600; fl.Q.value = 1.2;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      s.connect(fl); fl.connect(g); g.connect(mbus); s.start(t); s.stop(t + 0.13);
+    });
   }
   function hissMusic(at, vol, hp, len) { // 轻沙锤 / 雪橇铃
     const t = ctx.currentTime + at, s = ctx.createBufferSource(); s.buffer = noise();
