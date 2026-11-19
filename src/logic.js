@@ -109,7 +109,8 @@
     sea_river: s => has(s, f => f.rarity === 'common'),
     exotic_hunter: s => has(s, 'exotic'),
     monster_slayer: s => D.FISH.some(f => f.rarity === 'monster' && s.book[f.id]),
-    fairy: s => !!s.book.fairy,
+    fairy: s => D.FISH.some(f => f.rarity === 'fairy' && s.book[f.id]),
+    goddess: s => !!s.book.goddess,
     full_book: s => D.FISH.every(f => s.book[f.id]),
   };
 
