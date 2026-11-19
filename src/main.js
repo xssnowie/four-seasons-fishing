@@ -35,7 +35,7 @@
       o.progress = { cx: W / 2, y: hudH + 78, w: 760 };
       o.charge = { cx: W / 2, y: hudH + 80, w: 560 };
       o.hintY = H - 56; o.msgY = H * 0.36;
-      o.toast = { x: W / 2, y: hudH + 110, from: W + 320 };
+      o.toast = { x: W / 2, y: H - 250, from: W + 320 };
       o.waterTop = H * 0.32;
     } else {
       o.player = { x: 330, y: H - 175, size: 330 };
@@ -72,7 +72,8 @@
   function mmss(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
   function sceneLabel(sc) { return `${D.SEASON_CN[sc.season]} · ${D.WEATHER_CN[sc.weather]} · ${D.WATER_CN[sc.water]}`; }
   function condText(f) {
-    if (f.rarity === 'fairy') return '任何场景（极低概率）';
+    if (f.rarity === 'goddess') return '任何场景（极低概率）';
+    if (f.rarity === 'fairy') return `${D.SEASON_CN[f.season]}季 · 天气水域不限（低概率）`;
     const p = [];
     if (f.season) p.push(D.SEASON_CN[f.season] + '季'); else p.push('四季');
     if (f.weather) p.push(D.WEATHER_CN[f.weather] + '天');
@@ -86,8 +87,7 @@
     const m = [];
     // 场景背景不在这里：一张约 2MP，16 张全载手机会爆内存 → 用到时才加载（ensureBg）
     ['idle', 'cast', 'wait', 'reel', 'celebrate', 'float'].forEach(k => m.push(['player_' + k, `assets/player/${k}.png`]));
-    D.FISH.forEach(f => { if (f.rarity !== 'fairy') m.push(['fish_' + f.id, `assets/fish/${D.RARITY[f.rarity].folder}/${f.id}.png`]); });
-    D.SEASONS.forEach(s => m.push(['fairy_' + s, `assets/fish/fairy/${s}.png`]));
+    D.FISH.forEach(f => m.push(['fish_' + f.id, `assets/fish/${D.RARITY[f.rarity].folder}/${f.file}.png`]));
     ['logo', 'title_bg', 'title_bg_portrait', 'btn_primary', 'btn_secondary', 'panel', 'topbar',
       'card_common', 'card_rare', 'card_exotic', 'card_monster', 'card_fairy'].forEach(k => m.push(['ui_' + k, `assets/ui/${k}.png`]));
     D.ACHIEVEMENTS.forEach(a => m.push(['badge_' + a.id, `assets/badge/${a.id}.png`]));
@@ -207,6 +207,21 @@
     g.generateTexture(key, s, s); g.destroy();
   }
 
+  function makeGoddess(scene, key) { // 大隐藏水之女神占位：水蓝光环、水波、贝壳头冠
+    const g = scene.make.graphics({ x: 0, y: 0, add: false }), s = 512;
+    g.fillStyle(0xbfeaff, 0.5); g.fillCircle(256, 240, 250);
+    g.lineStyle(14, 0x4fc3f7, 0.9); g.strokeCircle(256, 120, 92);
+    g.fillStyle(0x6fd3ff, 0.95); [[150, 470], [256, 485], [362, 470]].forEach(([x, y]) => g.fillEllipse(x, y, 190, 60));
+    g.lineStyle(10, 0x9be7ff, 0.9); g.beginPath(); g.arc(256, 260, 200, Math.PI * 0.85, Math.PI * 2.15); g.strokePath();
+    g.fillStyle(0xe6f7ff, 1); g.fillTriangle(256, 190, 110, 460, 402, 460);
+    g.fillStyle(0x29a3d6, 1); g.fillRect(150, 300, 212, 14);
+    g.fillStyle(0xffe6d0, 1); g.fillCircle(256, 150, 60);
+    g.fillStyle(0x2b1d2e, 1); g.fillEllipse(256, 100, 140, 52); g.fillCircle(256, 60, 34);
+    g.fillStyle(0xfff0f5, 1); g.fillCircle(256, 40, 14); g.fillCircle(222, 70, 9); g.fillCircle(290, 70, 9);
+    g.fillStyle(0x2b1d2e, 1); g.fillCircle(236, 154, 6); g.fillCircle(276, 154, 6);
+    g.generateTexture(key, s, s); g.destroy();
+  }
+
   function makeSimple(scene, key, kind) {
     const g = scene.make.graphics({ x: 0, y: 0, add: false });
     if (kind === 'float') { g.fillStyle(0xffffff, 1); g.fillCircle(32, 40, 22); g.fillStyle(0xe8453c, 1); g.slice(32, 40, 22, Math.PI, 0, false); g.fillPath(); g.fillRect(29, 2, 6, 20); g.generateTexture(key, 64, 64); }
@@ -231,8 +246,10 @@
         missing.add(k);
         if (k === 'player_float') makeSimple(this, k, 'float');
         else if (k.startsWith('player_')) makePlayer(this, k, k.slice(7));
-        else if (k.startsWith('fish_')) makeFish(this, k, D.FISH.find(f => 'fish_' + f.id === k));
-        else if (k.startsWith('fairy_')) makeFairy(this, k, k.slice(6));
+        else if (k.startsWith('fish_')) {
+          const f = D.FISH.find(x => 'fish_' + x.id === k);
+          if (f.rarity === 'fairy') makeFairy(this, k, f.season); else if (f.rarity === 'goddess') makeGoddess(this, k); else makeFish(this, k, f);
+        }
         else if (k.startsWith('badge_')) makeSimple(this, k, 'badge');
         // ui_* 缺图时由界面用图形绘制
       });
@@ -638,36 +655,40 @@
       const res = L.recordCatch(this.save, fish, weight, this.sc, Date.now());
       L.persist(window.localStorage, this.save);
       const show = () => this.showResult(fish, weight, res);
-      if (fish.rarity === 'fairy') return this.fairyRise(show);
+      if (fish.rarity === 'fairy' || fish.rarity === 'goddess') return this.fairyRise(show, fish);
       if (fish.rarity === 'monster') { this.cameras.main.shake(1200, 0.014); A.play('monster'); if (navigator.vibrate) try { navigator.vibrate([200, 80, 300]); } catch (e) { /* ignore */ } this.time.delayedCall(900, show); return; }
       A.play(fish.rarity === 'common' ? 'catch' : fish.rarity === 'rare' ? 'rare' : 'exotic');
       show();
     }
 
-    fairyRise(done) {
-      A.play('fairy');
+    fairyRise(done, fish) {
+      const big = fish.rarity === 'goddess';
+      A.play('fairy'); if (big) this.time.delayedCall(700, () => A.play('exotic'));
+      if (big) { this.cameras.main.flash(900, 170, 230, 255); this.dim.setFillStyle(0x001a33, 0.35); }
       const x = Phaser.Math.Clamp(this.floatHome.x, 300, this.Lx.W - 300), y = Math.max(this.floatHome.y, this.Lx.hudH + 640);
-      const glow = this.add.circle(x, y, 40, 0xfff3b0, 0.8).setDepth(45);
-      this.tweens.add({ targets: glow, radius: 260, alpha: 0.25, duration: 1400, ease: 'Sine.Out' });
-      const f = this.add.image(x, y + 40, 'fairy_' + this.sc.season).setDepth(46).setScale(0.1).setAlpha(0);
-      this.tweens.add({ targets: f, y: y - 230, scale: Math.min(420 / f.width, 420 / f.height), alpha: 1, duration: 1500, ease: 'Sine.Out' });
-      for (let i = 0; i < 24; i++) {
-        const s = this.add.star(x + Phaser.Math.Between(-200, 200), y + Phaser.Math.Between(-60, 40), 5, 6, 14, 0xfff6a8).setDepth(47).setAlpha(0);
+      const glow = this.add.circle(x, y, 40, big ? 0x7fd8ff : 0xfff3b0, 0.8).setDepth(45);
+      this.tweens.add({ targets: glow, radius: big ? 380 : 260, alpha: 0.25, duration: 1400, ease: 'Sine.Out' });
+      const sz = big ? 560 : 420;
+      const f = this.add.image(x, y + 40, 'fish_' + fish.id).setDepth(46).setScale(0.1).setAlpha(0);
+      this.tweens.add({ targets: f, y: y - (big ? 300 : 230), scale: Math.min(sz / f.width, sz / f.height), alpha: 1, duration: big ? 2200 : 1500, ease: 'Sine.Out' });
+      for (let i = 0; i < (big ? 48 : 24); i++) {
+        const s = this.add.star(x + Phaser.Math.Between(-200, 200), y + Phaser.Math.Between(-60, 40), 5, 6, 14, big ? 0xbff0ff : 0xfff6a8).setDepth(47).setAlpha(0);
         this.tweens.add({ targets: s, y: s.y - Phaser.Math.Between(150, 400), alpha: { from: 1, to: 0 }, angle: 180, duration: 1800, delay: i * 50 });
       }
-      const bubble = T(this, x, y - 500, '凡人，你钓到本仙了～', 46, '#c2185b', { backgroundColor: '#fffaf0', padding: { x: 24, y: 14 } }).setOrigin(0.5).setDepth(48).setAlpha(0);
-      this.tweens.add({ targets: bubble, alpha: 1, delay: 1300, duration: 300 });
-      this.time.delayedCall(3300, () => { [glow, f, bubble].forEach(o => o.destroy()); done(); });
+      const line = big ? '凡人，你唤醒了水之女神。' : '凡人，你钓到本仙了～';
+      const bubble = T(this, x, y - (big ? 640 : 500), line, 46, big ? '#0b6e99' : '#c2185b', { backgroundColor: '#fffaf0', padding: { x: 24, y: 14 } }).setOrigin(0.5).setDepth(48).setAlpha(0);
+      this.tweens.add({ targets: bubble, alpha: 1, delay: big ? 1900 : 1300, duration: 300 });
+      this.time.delayedCall(big ? 4600 : 3300, () => { [glow, f, bubble].forEach(o => o.destroy()); if (big) this.dim.setFillStyle(0x1a2a3a, this.sc.weather === 'rainy' ? 0.28 : 0); done(); });
     }
 
     showResult(fish, weight, res) {
       const R = D.RARITY[fish.rarity], P = this.Lx.P, W = this.Lx.W;
-      const titles = { common: '钓到了！', rare: '稀有鱼！', exotic: '奇珍异兽出现！', monster: '怪兽被你钓起来了！！', fairy: '✨ 隐藏彩蛋 ✨' };
+      const titles = { common: '钓到了！', rare: '稀有鱼！', exotic: '奇珍异兽出现！', monster: '怪兽被你钓起来了！！', fairy: '✨ 小隐藏 · 四季小仙女 ✨', goddess: '🌊 大隐藏 · 水之女神 🌊' };
       const pw = P ? 960 : 900, ph = P ? 1060 : 700;
       const o = this.openOverlay(pw, ph, 'ui_panel', () => this.setIdle());
       const top = this.Lx.oy - ph / 2, at = f => top + ph * f;
       o.add(T(this, W / 2, at(0.15), titles[fish.rarity], P ? 64 : 58, fish.rarity === 'common' ? '#2e8b3e' : HEX(R.color), { stroke: '#ffffff', strokeThickness: 8 }).setOrigin(0.5));
-      const key = fish.rarity === 'fairy' ? 'fairy_' + this.sc.season : 'fish_' + fish.id;
+      const key = 'fish_' + fish.id;
       const img = fit(this.add.image(W / 2, at(P ? 0.40 : 0.42), key), P ? 560 : 330, P ? 440 : 300);
       o.add(img);
       this.tweens.add({ targets: img, y: img.y - 15, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.InOut' });
@@ -741,7 +762,7 @@
       const found = D.FISH.filter(f => this.save.book[f.id]).length;
       o.add(T(this, b.left + 50, b.top + 30, `📖 图鉴  ${found} / ${D.FISH.length}`, 48, INK));
       const TABS = [['sea', '普通·海', f => f.rarity === 'common' && f.water === 'sea'], ['river', '普通·河', f => f.rarity === 'common' && f.water === 'river'],
-        ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·彩蛋', f => f.rarity === 'monster' || f.rarity === 'fairy']];
+        ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·隐藏', f => f.rarity === 'monster' || f.rarity === 'fairy' || f.rarity === 'goddess']];
       const tw = P ? 182 : 230, tstep = P ? 192 : 250, ty = b.top + 128;
       TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openBook(id), { secondary: id !== tab, size: P ? 28 : 30 })));
       const list = D.FISH.filter(TABS.find(t => t[0] === tab)[2]);
@@ -756,16 +777,17 @@
       list.slice(page * per, page * per + per).forEach((f, i) => {
         const cx = gx + (i % cols) * sx, cy = gridTop + ch / 2 + Math.floor(i / cols) * sy;
         const got = this.save.book[f.id], R = D.RARITY[f.rarity];
-        if (has(this, 'ui_card_' + f.rarity)) o.add(this.add.image(cx, cy, 'ui_card_' + f.rarity).setDisplaySize(cw, ch));
+        const ck = 'ui_card_' + (f.rarity === 'goddess' ? 'fairy' : f.rarity);
+        if (has(this, ck)) o.add(this.add.image(cx, cy, ck).setDisplaySize(cw, ch));
         else { const g = this.add.graphics(); g.fillStyle(0xffffff, 1); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18); g.lineStyle(6, R.color, 1); g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18); o.add(g); }
-        const img = fit(this.add.image(cx, cy - 20, f.rarity === 'fairy' ? 'fairy_spring' : 'fish_' + f.id), 130, 115);
+        const img = fit(this.add.image(cx, cy - 20, 'fish_' + f.id), 130, 115);
         if (!got) img.setTintFill(0x3a3a4a);
         o.add(img);
         o.add(T(this, cx, cy + 66, got ? f.name : '???', 24, got ? INK : '#9a9a9a').setOrigin(0.5));
         const hit = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true });
         hit.on('pointerdown', () => {
           A.play('click');
-          if (!got) detail.setText(f.rarity === 'fairy' ? '??? —— 传说中会在任何地方出现' : `??? · 出现：${condText(f)}`);
+          if (!got) detail.setText(f.rarity === 'goddess' ? '??? —— 传说中会在任何地方出现' : `??? · 出现：${condText(f)}`);
           else detail.setText(`${f.name}（${R.cn}）· 出现：${condText(f)}\n最大 ${fmtW(got.maxW)} · 钓到 ${got.count} 次 · ${f.desc}`);
         });
         o.add(hit);
@@ -792,7 +814,7 @@
       D.ACHIEVEMENTS.forEach((a, i) => {
         const x = b.left + 110 + (i % cols) * colW, y = startY + Math.floor(i / cols) * step;
         const done = this.save.ach[a.id];
-        const badge = this.add.image(x, y, 'badge_' + a.id).setDisplaySize(120, 120);
+        const bs = Math.min(120, step - 10), badge = this.add.image(x, y, 'badge_' + a.id).setDisplaySize(bs, bs);
         if (!done) badge.setTint(0x777777).setAlpha(0.6);
         o.add(badge);
         o.add(T(this, x + 85, y - 54, a.name, 36, done ? INK : '#8a8a8a'));

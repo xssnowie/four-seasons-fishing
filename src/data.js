@@ -10,15 +10,16 @@
   const RARITY = {
     common:  { cn: '普通',     prob: 60,  safe: 0.40, strength: 0.25, reelTime: 3.0, weight: [0.2, 6],     color: 0x8fa3b8, folder: 'common' },
     rare:    { cn: '稀有',     prob: 30,  safe: 0.30, strength: 0.40, reelTime: 4.5, weight: [1, 18],      color: 0x3d8bfd, folder: 'rare' },
-    exotic:  { cn: '奇珍异兽', prob: 8,   safe: 0.22, strength: 0.60, reelTime: 6.0, weight: [10, 90],     color: 0xa04dff, folder: 'exotic' },
+    exotic:  { cn: '奇珍异兽', prob: 7.5, safe: 0.22, strength: 0.60, reelTime: 6.0, weight: [10, 90],     color: 0xa04dff, folder: 'exotic' },
     monster: { cn: '怪兽',     prob: 1.9, safe: 0.15, strength: 0.85, reelTime: 9.0, weight: [500, 6000],  color: 0xe8453c, folder: 'monster' },
-    fairy:   { cn: '隐藏彩蛋', prob: 0.1, safe: 0.25, strength: 0.30, reelTime: 5.0, weight: [42, 48],     color: 0xff8fc8, folder: 'fairy' },
+    fairy:   { cn: '小隐藏',   prob: 0.5, safe: 0.25, strength: 0.30, reelTime: 5.0, weight: [38, 46],     color: 0xff8fc8, folder: 'fairy' },
+    goddess: { cn: '大隐藏',   prob: 0.1, safe: 0.20, strength: 0.45, reelTime: 6.0, weight: [48, 52],     color: 0x1fa8d8, folder: 'fairy' },
   };
-  const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy'];
+  const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy', 'goddess'];
 
   const FISH = [];
-  function add(rarity, id, name, water, season, weather, desc) {
-    FISH.push({ id, name, rarity, water, season: season || null, weather: weather || null, desc: desc || '' });
+  function add(rarity, id, name, water, season, weather, desc, file) {
+    FISH.push({ id, name, rarity, water, season: season || null, weather: weather || null, desc: desc || '', file: file || id });
   }
 
   // ---- 普通 · 海（20）----
@@ -77,8 +78,14 @@
   add('monster', 'icetitan', '冰原巨兽', 'sea', 'winter', 'sunny', '冰川獠牙、霜甲加身的远古巨兽。');
   add('monster', 'deepabyss', '深海巨兆', 'sea', 'winter', 'rainy', '背负珊瑚礁的深海巨兽，灯笼一亮，海面就要变天。');
 
-  // ---- 彩蛋（1）：任何场景都可能出现 ----
-  add('fairy', 'fairy', '小仙女', null, null, null, '凡人，你钓到本仙了～');
+  // ---- 小隐藏 · 四季小仙女（4）：各在自己的季节出现，天气水域不限 ----
+  add('fairy', 'fairy_spring', '春 · 小仙女', null, 'spring', null, '桃花开的时候，她会在水边折一枝花。', 'spring');
+  add('fairy', 'fairy_summer', '夏 · 小仙女', null, 'summer', null, '戴着荷花冠，最爱在荷叶上打盹。', 'summer');
+  add('fairy', 'fairy_autumn', '秋 · 小仙女', null, 'autumn', null, '发间别着桂花，走过的地方都是香的。', 'autumn');
+  add('fairy', 'fairy_winter', '冬 · 小仙女', null, 'winter', null, '一身雪白，鬓边一支红梅。', 'winter');
+
+  // ---- 大隐藏 · 水之女神（1）：任何场景都可能出现 ----
+  add('goddess', 'goddess', '水之女神', null, null, null, '掌管江河湖海的女神，千年才回应一次钓竿。', 'goddess');
 
   // ---- 成就 ----
   const ACHIEVEMENTS = [
@@ -88,7 +95,8 @@
     { id: 'sea_river',      name: '海河通吃',        cond: '海、河图鉴各集齐普通鱼',      points: 40 },
     { id: 'exotic_hunter',  name: '异兽猎人',        cond: '集齐全部奇珍异兽',            points: 100 },
     { id: 'monster_slayer', name: '屠龙勇士',        cond: '钓起任一怪兽',                points: 80 },
-    { id: 'fairy',          name: '我钓到了小仙女',  cond: '钓起彩蛋小仙女',              points: 100 },
+    { id: 'fairy',          name: '我钓到了小仙女',  cond: '钓起任一位四季小仙女',        points: 60 },
+    { id: 'goddess',        name: '女神的眷顾',      cond: '钓起大隐藏水之女神',          points: 150 },
     { id: 'full_book',      name: '全图鉴',          cond: '图鉴 100%',                   points: 300 },
   ];
 
