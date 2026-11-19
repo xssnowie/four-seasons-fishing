@@ -87,40 +87,92 @@
     }
   }
 
-  // ---------- 背景音乐：按季节换调式和速度的生成式小曲 ----------
-  const MUSIC = {
-    spring: { root: 261.63, scale: [0, 2, 4, 7, 9], bpm: 96, wave: 'triangle' },     // C 大调五声，轻快
-    summer: { root: 293.66, scale: [0, 2, 4, 7, 9], bpm: 112, wave: 'square' },      // D 大调五声，活泼
-    autumn: { root: 220.00, scale: [0, 3, 5, 7, 10], bpm: 84, wave: 'triangle' },    // A 小调五声，温暖
-    winter: { root: 329.63, scale: [0, 3, 5, 7, 10], bpm: 70, wave: 'sine' },        // E 小调五声，空灵
+  // ---------- 背景音乐：四季各一首固定旋律的循环曲（8 小节 × 8 个八分音符）----------
+  // 旋律写法：[MIDI 音高 或 null(休止), 时值(八分音符个数)]，每小节加起来 = 8。和弦：每小节 1–2 个 [根音 MIDI, 'M'|'m']。
+  const SONGS = {
+    spring: { // C 大调，笛子 + 分解和弦，轻快
+      bpm: 100, lead: 'flute', comp: 'broken', perc: 'offbeat',
+      chords: [[[60, 'M']], [[55, 'M']], [[57, 'm']], [[53, 'M']], [[60, 'M']], [[55, 'M']], [[53, 'M'], [55, 'M']], [[60, 'M']]],
+      melody: [[76, 2], [79, 2], [84, 2], [79, 2], [74, 2], [79, 2], [83, 3], [81, 1], [81, 2], [84, 2], [76, 2], [81, 2], [77, 3], [76, 1], [74, 2], [72, 2],
+        [76, 2], [79, 2], [84, 2], [88, 2], [86, 3], [84, 1], [83, 2], [79, 2], [81, 2], [77, 2], [79, 2], [83, 2], [84, 6], [null, 2]],
+    },
+    summer: { // F 大调，木琴 + 反拍和弦 + 沙锤，带切分
+      bpm: 112, lead: 'marimba', comp: 'offbeat', perc: 'shaker',
+      chords: [[[53, 'M']], [[50, 'm']], [[58, 'M']], [[60, 'M']], [[53, 'M']], [[50, 'm']], [[58, 'M'], [60, 'M']], [[53, 'M']]],
+      melody: [[69, 1], [72, 1], [77, 2], [81, 1], [79, 1], [77, 2], [74, 2], [77, 1], [81, 1], [null, 1], [81, 1], [79, 2], [77, 1], [79, 1], [82, 2], [81, 2], [79, 2],
+        [76, 2], [79, 2], [84, 3], [null, 1], [81, 1], [81, 1], [84, 2], [81, 1], [79, 1], [77, 2], [77, 2], [81, 2], [86, 3], [84, 1], [82, 2], [81, 2], [79, 2], [76, 2], [77, 6], [null, 2]],
+    },
+    autumn: { // A 小调，拨弦 + 琶音，温暖
+      bpm: 84, lead: 'pluck', comp: 'arp', perc: null,
+      chords: [[[57, 'm']], [[53, 'M']], [[60, 'M']], [[55, 'M']], [[57, 'm']], [[50, 'm']], [[52, 'M']], [[57, 'm']]],
+      melody: [[76, 3], [74, 1], [72, 2], [69, 2], [72, 2], [77, 2], [76, 3], [74, 1], [76, 2], [79, 2], [76, 2], [72, 2], [74, 4], [71, 2], [null, 2],
+        [81, 3], [79, 1], [76, 2], [72, 2], [74, 2], [77, 2], [81, 3], [79, 1], [80, 2], [76, 2], [71, 2], [74, 2], [72, 2], [71, 2], [69, 4]],
+    },
+    winter: { // E 小调，八音盒 + 长音铺底，空灵
+      bpm: 68, lead: 'musicbox', comp: 'pad', perc: null,
+      chords: [[[52, 'm']], [[48, 'M']], [[55, 'M']], [[50, 'M']], [[52, 'm']], [[48, 'M']], [[57, 'm']], [[59, 'M']]],
+      melody: [[83, 2], [88, 2], [91, 2], [90, 2], [88, 4], [null, 2], [79, 2], [83, 2], [86, 2], [91, 3], [90, 1], [90, 4], [86, 2], [null, 2],
+        [91, 2], [90, 2], [88, 2], [83, 2], [84, 2], [88, 2], [91, 4], [93, 2], [91, 2], [88, 2], [84, 2], [87, 4], [83, 4]],
+    },
   };
-  let music = null;
-  function note(cfg, deg, oct) {
-    const n = cfg.scale.length, i = ((deg % n) + n) % n, o = Math.floor(deg / n) + oct;
-    return cfg.root * Math.pow(2, (cfg.scale[i] + 12 * o) / 12);
+  const mf = m => 440 * Math.pow(2, (m - 69) / 12);
+  const triad = (root, q) => [root, root + (q === 'm' ? 3 : 4), root + 7];
+
+  function instrument(kind, midi, dur, at, vol) {
+    const f = mf(midi), o = { at, bus: musicBus };
+    if (kind === 'flute') { tone(f, dur, Object.assign({ type: 'triangle', vol: vol, attack: 0.04 }, o)); tone(f * 2, dur * 0.8, Object.assign({ type: 'sine', vol: vol * 0.15, attack: 0.05 }, o)); }
+    else if (kind === 'marimba') { tone(f, Math.min(dur, 0.45), Object.assign({ type: 'sine', vol: vol, attack: 0.003 }, o)); tone(f * 4, 0.08, Object.assign({ type: 'sine', vol: vol * 0.25, attack: 0.002 }, o)); }
+    else if (kind === 'pluck') { tone(f, Math.min(dur + 0.3, 1.1), Object.assign({ type: 'triangle', vol: vol, attack: 0.004 }, o)); tone(f * 2, 0.25, Object.assign({ type: 'sine', vol: vol * 0.2, attack: 0.003 }, o)); }
+    else if (kind === 'musicbox') { tone(f, 1.6, Object.assign({ type: 'sine', vol: vol, attack: 0.003 }, o)); tone(f * 3, 0.5, Object.assign({ type: 'sine', vol: vol * 0.18, attack: 0.002 }, o)); }
+    else tone(f, dur, Object.assign({ type: 'sine', vol: vol, attack: 0.02 }, o));
   }
+
+  // 把歌展开成「第几个八分音符 → 要播的音」
+  function compile(song) {
+    const ev = Array.from({ length: 64 }, () => []);
+    let t = 0;
+    song.melody.forEach(([m, len]) => { if (m != null) ev[t].push({ part: 'lead', m, len }); t += len; });
+    song.chords.forEach((bar, b) => bar.forEach(([root, q], half) => {
+      const span = 8 / bar.length, s0 = b * 8 + half * span, n = triad(root, q);
+      ev[s0].push({ part: 'bass', m: root - 12, len: span });
+      for (let k = 0; k < span; k++) ev[s0 + k].push({ part: 'comp', notes: n, k, span });
+    }));
+    return ev;
+  }
+
+  let music = null;
   function startMusic(season) {
     if (!ensure()) return;
     stopMusic();
-    const cfg = MUSIC[season] || MUSIC.spring;
-    const beat = 60 / cfg.bpm / 2; // 八分音符
-    let step = 0, deg = 2, next = ctx.currentTime + 0.1;
+    const song = SONGS[season] || SONGS.spring, ev = compile(song);
+    const eighth = 60 / song.bpm / 2;
+    let step = 0, loop = 0, next = ctx.currentTime + 0.15;
     const timer = setInterval(() => {
       while (next < ctx.currentTime + 0.3) {
-        const at = next - ctx.currentTime;
-        if (step % 8 === 0) { // 每小节一个低音
-          const bassDeg = [0, 3, 4, 2][Math.floor(step / 8) % 4];
-          tone(note(cfg, bassDeg, -1), beat * 7, { type: 'sine', vol: 0.35, at, bus: musicBus, attack: 0.02 });
-        }
-        if (Math.random() < (season === 'winter' ? 0.45 : 0.7)) { // 旋律：随机游走
-          deg += [-2, -1, -1, 0, 1, 1, 2][Math.floor(Math.random() * 7)];
-          deg = Math.max(0, Math.min(9, deg));
-          tone(note(cfg, deg, 0), beat * 1.6, { type: cfg.wave, vol: cfg.wave === 'square' ? 0.08 : 0.18, at, bus: musicBus, attack: 0.01 });
-        }
-        step++; next += beat;
+        const at = next - ctx.currentTime, restLoop = loop % 3 === 2; // 每 3 遍有 1 遍只留伴奏
+        ev[step].forEach(e => {
+          if (e.part === 'lead' && !restLoop) instrument(song.lead, e.m, e.len * eighth * 0.95, at, song.lead === 'musicbox' ? 0.22 : 0.2);
+          else if (e.part === 'bass') tone(mf(e.m), Math.min(e.len * eighth, 1.6), { type: 'sine', vol: 0.3, at, bus: musicBus, attack: 0.02 });
+          else if (e.part === 'comp') {
+            const [a, b, c] = e.notes;
+            if (song.comp === 'broken') { const seq = [a, c, b + 12, c]; tone(mf(seq[e.k % 4] + 12), eighth * 1.6, { type: 'triangle', vol: 0.06, at, bus: musicBus }); }
+            else if (song.comp === 'arp') { const seq = [a, b, c, a + 12, c, b, a + 12, c]; instrument('pluck', seq[e.k % 8], eighth, at, 0.07); }
+            else if (song.comp === 'offbeat') { if (e.k % 2 === 1) [a, b, c].forEach(m => tone(mf(m + 12), eighth * 0.6, { type: 'triangle', vol: 0.045, at, bus: musicBus, attack: 0.005 })); }
+            else if (song.comp === 'pad' && e.k === 0) [a, b, c].forEach(m => tone(mf(m + 12), e.span * eighth * 1.1, { type: 'sine', vol: 0.06, at, bus: musicBus, attack: 0.4 }));
+          }
+        });
+        if (song.perc === 'shaker' || (song.perc === 'offbeat' && step % 2 === 1)) hissMusic(at, step % 2 ? 0.05 : 0.03);
+        step++; next += eighth;
+        if (step === 64) { step = 0; loop++; }
       }
     }, 100);
     music = { timer };
+  }
+  function hissMusic(at, vol) { // 轻沙锤
+    const t = ctx.currentTime + at, s = ctx.createBufferSource(); s.buffer = noise();
+    const fl = ctx.createBiquadFilter(); fl.type = 'highpass'; fl.frequency.value = 6000;
+    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    s.connect(fl); fl.connect(g); g.connect(musicBus); s.start(t); s.stop(t + 0.08);
   }
   function stopMusic() { if (music) { clearInterval(music.timer); music = null; } }
 
