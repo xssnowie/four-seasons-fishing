@@ -58,7 +58,7 @@
     const s = Math.max(L0.W / iw, L0.H / ih);
     return { s, iw, ih, at: (fx, fy) => ({ x: fx * iw * s, y: L0.H - (1 - fy) * ih * s }) };
   }
-  const ICE = { landscape: [0.65, 0.65], portrait: [0.62, 0.56] }; // 冰洞在背景图里的相对位置（素材指令里写的同一位置）
+  const ICE = { landscape: [0.716, 0.722], portrait: [0.733, 0.671] }; // 冰洞在背景图里的相对位置（素材指令里写的同一位置）
 
   function T(scene, x, y, str, size, color, extra) {
     return scene.add.text(x, y, str, Object.assign({ fontFamily: FONT, fontSize: Math.max(size, MIN_FONT) + 'px', color: color || INK }, extra || {}));
@@ -264,7 +264,7 @@
   function has(scene, key) { return !scene.registry.get('missing').has(key) && scene.textures.exists(key); }
 
   function panel(scene, x, y, w, h, key) {
-    if (key && has(scene, key)) return scene.add.nineslice(x, y, key, null, w, h, 80, 80, 80, 80); // 素材四边做九宫格拉伸
+    if (key && has(scene, key)) return scene.add.nineslice(x, y, key, null, w, h, 130, 130, 130, 130); // 素材四边做九宫格拉伸（角上的绳结/海星不拉变形）
     const g = scene.add.graphics();
     g.fillStyle(0x000000, 0.25); g.fillRoundedRect(x - w / 2 + 8, y - h / 2 + 12, w, h, 36);
     g.fillStyle(0x9a6534, 1); g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 36);
@@ -402,10 +402,13 @@
     // ---------- HUD ----------
     buildHud() {
       const Lx = this.Lx, d = 100, W = Lx.W;
-      if (has(this, 'ui_topbar')) this.add.nineslice(W / 2, Lx.hudH / 2, 'ui_topbar', null, W, Lx.hudH, 60, 60, 20, 20).setDepth(d);
+      // 顶栏素材：只横向拉伸中段（左舵轮、右救生圈保持原比例），整体按高度等比缩放
+      const barH = Lx.P ? 140 : Lx.hudH, bs = barH / 240, orn = has(this, 'ui_topbar') ? 300 * bs : 0;
+      if (has(this, 'ui_topbar')) this.add.nineslice(W / 2, barH / 2, 'ui_topbar', null, W / bs, 240, 300, 310).setScale(bs).setDepth(d);
       else { const g = this.add.graphics().setDepth(d); g.fillStyle(0x6b4220, 0.88); g.fillRect(0, 0, W, Lx.hudH); g.fillStyle(0x9a6534, 1); g.fillRect(0, Lx.hudH - 8, W, 8); }
-      this.sceneText = T(this, 32, 16, '', 46, '#fff6e0', { stroke: '#3a2410', strokeThickness: 6 }).setDepth(d + 1);
-      this.clockText = T(this, 34, 72, '', 24, '#ffe9c4').setDepth(d + 1);
+      const tx = Math.max(32, orn - 10);
+      this.sceneText = T(this, tx, Lx.P ? 18 : 10, '', Lx.P ? 46 : 42, '#fff6e0', { stroke: '#3a2410', strokeThickness: 6 }).setDepth(d + 1);
+      this.clockText = T(this, tx + 2, Lx.P ? 74 : 62, '', Lx.P ? 26 : 22, '#ffe9c4', { stroke: '#3a2410', strokeThickness: 4 }).setDepth(d + 1);
       const mk = (x, y, w, h, label, fn, sec) => button(this, x, y, w, h, label, fn, { secondary: sec, size: 30 }).setDepth(d + 1);
       if (Lx.P) {
         const y = 172, bw = 196, step = 209, x0 = 22 + bw / 2;
@@ -413,13 +416,14 @@
         mk(x0 + step * 2, y, bw, 84, '📖 图鉴', () => this.openBook());
         mk(x0 + step * 3, y, bw, 84, '🏆 成就', () => this.openAch());
         mk(x0 + step * 4, y, bw, 84, '📊 榜单', () => this.openRank());
-        this.muteBtn = mk(W - 70, 56, 100, 84, '', () => this.toggleMute(), true);
+        this.muteBtn = mk(W - Math.max(70, orn + 40), 66, 100, 84, '', () => this.toggleMute(), true);
       } else {
         this.waterBtns = { sea: mk(760, 56, 170, 80, '🌊 海', () => this.switchWater('sea'), true), river: mk(950, 56, 170, 80, '🏞️ 河', () => this.switchWater('river'), true) };
-        mk(W - 660, 56, 170, 80, '📖 图鉴', () => this.openBook());
-        mk(W - 470, 56, 170, 80, '🏆 成就', () => this.openAch());
-        mk(W - 280, 56, 170, 80, '📊 成就榜', () => this.openRank());
-        this.muteBtn = mk(W - 90, 56, 100, 80, '', () => this.toggleMute(), true);
+        const r = Math.max(0, orn - 40); // 给右边救生圈让位
+        mk(W - 660 - r, 56, 170, 80, '📖 图鉴', () => this.openBook());
+        mk(W - 470 - r, 56, 170, 80, '🏆 成就', () => this.openAch());
+        mk(W - 280 - r, 56, 170, 80, '📊 成就榜', () => this.openRank());
+        this.muteBtn = mk(W - 90 - r, 56, 100, 80, '', () => this.toggleMute(), true);
       }
       this.muteBtn.label.setText(A.isMuted() ? '🔇' : '🔊');
     }
@@ -747,7 +751,8 @@
     sheet() {
       const Lx = this.Lx, w = Lx.P ? 1020 : Math.min(1700, Lx.W - 120), h = Lx.H - Lx.hudH - (Lx.P ? 50 : 40);
       const o = this.openOverlay(w, h, 'ui_panel');
-      const box = { o, w, h, left: Lx.W / 2 - w / 2, top: Lx.oy - h / 2, right: Lx.W / 2 + w / 2, bottom: Lx.oy + h / 2 };
+      const m = has(this, 'ui_panel') ? 34 : 0; // 素材边框较厚，内容整体往里收
+      const box = { o, w: w - 2 * m, h: h - 2 * m, left: Lx.W / 2 - w / 2 + m, top: Lx.oy - h / 2 + m, right: Lx.W / 2 + w / 2 - m, bottom: Lx.oy + h / 2 - m };
       o.add(button(this, box.right - 56, box.top + 56, 80, 80, '✕', () => this.closeOverlay(), { secondary: true, size: 34 }));
       return box;
     }
@@ -763,12 +768,12 @@
       o.add(T(this, b.left + 50, b.top + 30, `📖 图鉴  ${found} / ${D.FISH.length}`, 48, INK));
       const TABS = [['sea', '普通·海', f => f.rarity === 'common' && f.water === 'sea'], ['river', '普通·河', f => f.rarity === 'common' && f.water === 'river'],
         ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·隐藏', f => f.rarity === 'monster' || f.rarity === 'fairy' || f.rarity === 'goddess']];
-      const tw = P ? 182 : 230, tstep = P ? 192 : 250, ty = b.top + 128;
+      const tw = P ? 182 : 230, tstep = P ? 192 : 250, ty = b.top + (P ? 128 : 112);
       TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openBook(id), { secondary: id !== tab, size: P ? 28 : 30 })));
       const list = D.FISH.filter(TABS.find(t => t[0] === tab)[2]);
       const cw = 164, ch = 190, sx = 183, sy = 200;
       const cols = Math.max(1, Math.floor((b.w - 60) / sx));
-      const gridTop = ty + 60, footer = P ? 210 : 110;
+      const gridTop = ty + (P ? 60 : 52), footer = P ? 210 : 90;
       const rows = Math.max(1, Math.floor((b.bottom - footer - gridTop) / sy));
       const per = cols * rows, pages = Math.ceil(list.length / per);
       page = Math.min(page, pages - 1);
