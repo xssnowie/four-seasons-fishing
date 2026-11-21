@@ -69,13 +69,36 @@
   function emptySave() {
     return { book: {}, ach: {}, total: 0, rainCatches: 0, seasons: {}, catches: [] };
   }
-  function load(storage) {
-    try { const s = JSON.parse(storage.getItem(KEY)); if (s && s.book) return Object.assign(emptySave(), s); } catch (e) { /* 无存档或被禁用 */ }
+  function load(storage, key) {
+    try { const s = JSON.parse(storage.getItem(key || KEY)); if (s && s.book) return Object.assign(emptySave(), s); } catch (e) { /* 无存档或被禁用 */ }
     return emptySave();
   }
-  function persist(storage, save) {
-    try { storage.setItem(KEY, JSON.stringify(save)); return true; } catch (e) { return false; }
+  function persist(storage, save, key) {
+    try { storage.setItem(key || KEY, JSON.stringify(save)); return true; } catch (e) { return false; }
   }
+
+  // 两份存档合并（本机 + 云端，或游客进度并入账号）：只增不减，谁的记录好就留谁的
+  function merge(a, b) {
+    a = Object.assign(emptySave(), a || {}); b = Object.assign(emptySave(), b || {});
+    const out = emptySave();
+    new Set([...Object.keys(a.book), ...Object.keys(b.book)]).forEach(id => {
+      const x = a.book[id], y = b.book[id];
+      out.book[id] = !x ? Object.assign({}, y) : !y ? Object.assign({}, x)
+        : { count: Math.max(x.count, y.count), maxW: Math.max(x.maxW, y.maxW), first: Math.min(x.first, y.first) };
+    });
+    new Set([...Object.keys(a.ach), ...Object.keys(b.ach)]).forEach(id => {
+      out.ach[id] = Math.min(a.ach[id] || Infinity, b.ach[id] || Infinity);
+    });
+    out.total = Math.max(a.total, b.total);
+    out.rainCatches = Math.max(a.rainCatches, b.rainCatches);
+    Object.assign(out.seasons, a.seasons, b.seasons);
+    const seen = new Set();
+    out.catches = [...a.catches, ...b.catches].filter(c => { const k = c.id + '|' + c.w + '|' + c.t; if (seen.has(k)) return false; seen.add(k); return true; })
+      .sort((p, q) => q.w - p.w).slice(0, 200);
+    checkAchievements(out, Date.now()); // 合并后可能凑齐新成就（例如两边各有一半图鉴）
+    return out;
+  }
+  const isEmpty = s => !s || !s.total;
 
   // 记一条鱼；返回 { isNew, isRecord, newAch: [成就] }
   function recordCatch(save, fish, weight, scene, now) {
@@ -132,7 +155,7 @@
     return { points, maxPoints, found, totalFish: D.FISH.length, top: fishOnly.slice(0, 10), topMonsters: monsters.slice(0, 5) };
   }
 
-  const api = { sceneAt, eligible, rarityWeights, pickFish, emptySave, load, persist, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
+  const api = { sceneAt, eligible, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GameLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

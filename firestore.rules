@@ -1,0 +1,18 @@
+rules_version = '2';
+// 四季钓场：每个玩家只能读写自己的存档 saves/{uid}
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /saves/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['save', 'name', 'updatedAt'])
+        && request.resource.data.save is string
+        && request.resource.data.save.size() < 200000
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 16;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

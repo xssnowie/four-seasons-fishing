@@ -339,8 +339,15 @@
       const tip = TOUCH ? '按住屏幕蓄力 · 松手抛竿 · 浮标下沉时点一下 · 拉扯时让张力停在绿区' : '按住蓄力 · 松开抛竿 · 浮标下沉时点一下提竿 · 拉扯时让张力停在绿区';
       T(this, W / 2, P ? H - 160 : H - 70, tip, 30, '#ffffff', { stroke: '#4a2f17', strokeThickness: 5, align: 'center', wordWrap: { width: W - 120, useAdvancedWrap: true } }).setOrigin(0.5);
       this.input.keyboard && this.input.keyboard.once('keydown-SPACE', go);
+      // 账号入口（没配置 Firebase 时不显示）
+      if (window.Store.enabled) {
+        const ab = button(this, W / 2, P ? H * 0.55 + 200 : 830, P ? 520 : 420, P ? 110 : 90, acctLabel(), () => window.AccountUI.open(), { secondary: true, size: P ? 38 : 34 });
+        const off = window.Store.onChange(() => ab.scene && ab.label.setText(acctLabel()));
+        this.events.once('shutdown', off);
+      }
     }
   }
+  function acctLabel() { const S = window.Store; return !S.ready ? '👤 账号' : S.user ? `👤 ${S.user.name}` : '👤 登录 / 注册 存进度'; }
 
   // ---------------- 钓鱼主场景 ----------------
   class Game extends Phaser.Scene {
@@ -348,7 +355,7 @@
 
     create() {
       const Lx = this.Lx = layout(this.scale.width, this.scale.height);
-      this.save = L.load(window.localStorage);
+      this.save = window.Store.save; // 同一个对象：登录 / 云端合并时原地更新
       this.water = (() => { try { return localStorage.getItem('fishing.water') || 'sea'; } catch (e) { return 'sea'; } })();
       this.sc = currentScene(this.water);
       this.state = 'idle';
@@ -389,6 +396,12 @@
       this.events.once('shutdown', () => this.game.events.off('blur', this.onBlur));
       this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tickClock() });
       this.tickClock();
+      let uid = window.Store.user && window.Store.user.uid;
+      const offStore = window.Store.onChange(S => { // 登录 / 退出后，开着的榜单刷新一下
+        const u = S.user && S.user.uid; if (u === uid) return; uid = u;
+        if (this.overlay && this.overlayKind === 'rank') this.openRank();
+      });
+      this.events.once('shutdown', offStore);
     }
 
     bgKey() { return `${this.Lx.P ? 'bgp' : 'bg'}_${this.sc.season}_${this.water}`; }
@@ -657,7 +670,7 @@
       this.player.setTexture('player_celebrate');
       const { fish, weight } = this.hook;
       const res = L.recordCatch(this.save, fish, weight, this.sc, Date.now());
-      L.persist(window.localStorage, this.save);
+      window.Store.commit();
       const show = () => this.showResult(fish, weight, res);
       if (fish.rarity === 'fairy' || fish.rarity === 'goddess') return this.fairyRise(show, fish);
       if (fish.rarity === 'monster') { this.cameras.main.shake(1200, 0.014); A.play('monster'); if (navigator.vibrate) try { navigator.vibrate([200, 80, 300]); } catch (e) { /* ignore */ } this.time.delayedCall(900, show); return; }
@@ -741,7 +754,7 @@
 
     closeOverlay(silent) {
       if (!this.overlay) return;
-      this.overlay.destroy(); this.overlay = null;
+      this.overlay.destroy(); this.overlay = null; this.overlayKind = null;
       this.hint.setVisible(true);
       const cb = this.overlayClose; this.overlayClose = null;
       if (!silent && cb) cb();
@@ -831,11 +844,14 @@
     // 成就榜（只存本机：显示自己的成绩）
     openRank() {
       if (this.busy()) return;
-      const b = this.sheet(), o = b.o, P = this.Lx.P;
+      const b = this.sheet(), o = b.o, P = this.Lx.P, SS = window.Store;
+      this.overlayKind = 'rank';
       const st = L.stats(this.save);
       const byId = Object.fromEntries(D.FISH.map(f => [f.id, f]));
       o.add(T(this, b.left + 50, b.top + 30, '📊 我的成就榜', 48, INK));
-      o.add(T(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（成绩只存在这台设备）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));
+      const where = SS.user ? `👤 ${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端' : '成绩只存在这台设备';
+      o.add(T(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));
+      if (SS.enabled) o.add(button(this, b.right - 56 - 60 - (P ? 130 : 150), b.top + 56, P ? 260 : 300, 80, SS.user ? '👤 账号' : '👤 登录/注册', () => window.AccountUI.open(), { secondary: true, size: 30 }));
       const best = st.top[0];
       const cards = [['成就点数', `${st.points}`, `/ ${st.maxPoints}`], ['图鉴完成度', `${Math.round(st.found / st.totalFish * 100)}%`, `${st.found} / ${st.totalFish}`],
         ['最大一条', best ? fmtW(best.w) : '—', best ? byId[best.id].name : '还没钓到']];
