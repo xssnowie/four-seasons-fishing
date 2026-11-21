@@ -65,6 +65,8 @@
     autumn_river: [0.24, 0.90], autumn_sea: [0.25, 0.88], spring_river: [0.25, 0.86], spring_sea: [0.18, 0.90],
     summer_river: [0.18, 0.82], summer_sea: [0.22, 0.88], winter_river: [0.22, 0.94], winter_sea: [0.30, 0.93],
   };
+  // 横屏背景（1920×1080）大多在默认位置就有码头；冬天的河默认位置正好是背景里的木凳，挪到凳子右边的雪堆上
+  const PLAYER_SPOT_L = { winter_river: [0.33, 0.93] };
 
   // 鱼竿素材（裁边后）：握把中心对准拳头，竿尖接鱼线；rod 1449×147，rod_bent 1438×144
   const ROD_IMG = {
@@ -395,6 +397,7 @@
 
     create() {
       const Lx = this.Lx = layout(this.scale.width, this.scale.height);
+      this.playerHome = null; // 转屏重排时布局变了，默认站位要重新取
       this.save = window.Store.save; // 同一个对象：登录 / 云端合并时原地更新
       this.water = (() => { try { return localStorage.getItem('fishing.water') || 'sea'; } catch (e) { return 'sea'; } })();
       this.sc = currentScene(this.water);
@@ -522,11 +525,14 @@
 
     // 竖屏：人物站到当前背景的码头 / 岸上（横屏的背景都在同一位置有码头，不用换）
     placePlayer() {
-      const Lx = this.Lx, spot = Lx.P && PLAYER_SPOT[`${this.sc.season}_${this.water}`];
-      if (!spot) return;
-      const s = Math.max(Lx.W / 1080, Lx.H / 1920), half = Lx.player.size / 2;
-      Lx.player.x = Phaser.Math.Clamp(spot[0] * 1080 * s, half - 40, Lx.W / 2);
-      Lx.player.y = Math.min(Lx.H - 20, Lx.H - (1 - spot[1]) * 1920 * s);
+      const Lx = this.Lx, key = `${this.sc.season}_${this.water}`, spot = (Lx.P ? PLAYER_SPOT : PLAYER_SPOT_L)[key];
+      if (!this.playerHome) this.playerHome = { x: Lx.player.x, y: Lx.player.y }; // 布局给的默认位置
+      if (!spot) { Lx.player.x = this.playerHome.x; Lx.player.y = this.playerHome.y; }
+      else {
+        const iw = Lx.P ? 1080 : 1920, ih = Lx.P ? 1920 : 1080, s = Math.max(Lx.W / iw, Lx.H / ih), half = Lx.player.size / 2;
+        Lx.player.x = Phaser.Math.Clamp(spot[0] * iw * s, half - 40, Lx.W / 2);
+        Lx.player.y = Math.min(Lx.H - 20, Lx.H - (1 - spot[1]) * ih * s);
+      }
       this.player.setPosition(Lx.player.x, Lx.player.y);
     }
 
