@@ -60,6 +60,12 @@
     player_celebrate: { hand: [387, 128], rod: [0.25, -0.80] },
   };
 
+  // 竖屏背景里人物脚踩的位置（背景图宽、高的比例），按每张图的码头 / 岸边量的
+  const PLAYER_SPOT = {
+    autumn_river: [0.24, 0.90], autumn_sea: [0.25, 0.88], spring_river: [0.25, 0.86], spring_sea: [0.18, 0.90],
+    summer_river: [0.18, 0.82], summer_sea: [0.22, 0.88], winter_river: [0.22, 0.94], winter_sea: [0.30, 0.93],
+  };
+
   // 鱼竿素材（裁边后）：握把中心对准拳头，竿尖接鱼线；rod 1449×147，rod_bent 1438×144
   const ROD_IMG = {
     player_rod: { w: 1449, h: 147, grip: [118, 42.5], tip: [1447, 36.5] },
@@ -514,8 +520,19 @@
       if (s.season !== this.sc.season || s.weather !== this.sc.weather) { this.sc = s; this.applyScene(false); }
     }
 
+    // 竖屏：人物站到当前背景的码头 / 岸上（横屏的背景都在同一位置有码头，不用换）
+    placePlayer() {
+      const Lx = this.Lx, spot = Lx.P && PLAYER_SPOT[`${this.sc.season}_${this.water}`];
+      if (!spot) return;
+      const s = Math.max(Lx.W / 1080, Lx.H / 1920), half = Lx.player.size / 2;
+      Lx.player.x = Phaser.Math.Clamp(spot[0] * 1080 * s, half - 40, Lx.W / 2);
+      Lx.player.y = Math.min(Lx.H - 20, Lx.H - (1 - spot[1]) * 1920 * s);
+      this.player.setPosition(Lx.player.x, Lx.player.y);
+    }
+
     applyScene(first) {
       this.sc.water = this.water;
+      this.placePlayer();
       const key = this.bgKey();
       ensureBg(this, key, () => { if (!this.bg.scene || this.bgKey() !== key) return; this.bg.setTexture(key).setVisible(true); this.bg.setScale(bgMap(this.Lx, this.bg.texture).s); });
       const rainy = this.sc.weather === 'rainy';
