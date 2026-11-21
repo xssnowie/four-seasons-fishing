@@ -252,10 +252,22 @@
     preload() {
       const t = T(this, this.scale.width / 2, this.scale.height / 2, '加载中… 0%', 48, '#ffffff').setOrigin(0.5);
       this.load.on('progress', v => t.setText('加载中… ' + Math.round(v * 100) + '%'));
-      this.load.on('loaderror', () => { /* 缺图正常，下面补占位 */ });
+      this.failed = []; this.tries = 0;
+      this.load.on('loaderror', f => this.failed.push([f.key, f.url])); // 网络不稳 / 正在发布时可能个别图下载失败
       manifest().forEach(([k, p]) => this.load.image(k, p));
     }
     create() {
+      // 下载失败的图最多再试 2 次（间隔 0.8 秒），都失败才用占位图，免得一次网络抖动就变成「小鱼苗」
+      if (this.failed.length && this.tries < 2) {
+        const again = this.failed; this.failed = []; this.tries++;
+        console.warn(`[fishing] ${again.length} 张图下载失败，第 ${this.tries} 次重试`);
+        this.time.delayedCall(800, () => {
+          again.forEach(([k, u]) => this.load.image(k, u.split('?')[0] + '?retry=' + this.tries + '-' + Date.now()));
+          this.load.once('complete', () => this.create());
+          this.load.start();
+        });
+        return;
+      }
       const missing = new Set();
       manifest().forEach(([k]) => {
         if (this.textures.exists(k)) return;
