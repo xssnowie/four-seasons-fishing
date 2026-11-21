@@ -3,6 +3,7 @@
 (function () {
   const D = window.GameData, L = window.GameLogic, A = window.GameAudio;
   const FONT = '"ZCOOL KuaiLe","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif'; // 站酷快乐体（assets/font，OFL 授权）
+  const BODY = '"MaoKenTangYuan (beta)","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif'; // 猫啃网糖圆体（assets/font/tangyuan，OFL）
   const INK = '#4a2f17';
     const HEX = n => '#' + n.toString(16).padStart(6, '0');
   const TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -59,6 +60,12 @@
     player_celebrate: { hand: [387, 128], rod: [0.25, -0.80] },
   };
 
+  // 鱼竿素材（裁边后）：握把中心对准拳头，竿尖接鱼线；rod 1449×147，rod_bent 1438×144
+  const ROD_IMG = {
+    player_rod: { w: 1449, h: 147, grip: [118, 42.5], tip: [1447, 36.5] },
+    player_rod_bent: { w: 1438, h: 144, grip: [118, 42.5], tip: [1436, 90] },
+  };
+
   // 背景图（cover，左下对齐）坐标 → 画面坐标
   function bgMap(L0, tex) {
     const iw = tex.getSourceImage().width, ih = tex.getSourceImage().height;
@@ -67,6 +74,8 @@
   }
   const ICE = { landscape: [0.716, 0.722], portrait: [0.733, 0.671] }; // 冰洞在背景图里的相对位置（素材指令里写的同一位置）
 
+  // 多字的说明、列表、提示用圆体（猫啃网糖圆体），标题和按钮保持站酷快乐体
+  function TB(scene, x, y, str, size, color, extra) { return T(scene, x, y, str, size, color, Object.assign({ fontFamily: BODY }, extra || {})); }
   function T(scene, x, y, str, size, color, extra) {
     return scene.add.text(x, y, str, Object.assign({ fontFamily: FONT, fontSize: Math.max(size, MIN_FONT) + 'px', color: color || INK }, extra || {}));
   }
@@ -93,10 +102,10 @@
   function manifest() {
     const m = [];
     // 场景背景不在这里：一张约 2MP，16 张全载手机会爆内存 → 用到时才加载（ensureBg）
-    ['idle', 'cast', 'wait', 'reel', 'celebrate', 'float'].forEach(k => m.push(['player_' + k, `assets/player/${k}.png`]));
+    ['idle', 'cast', 'wait', 'reel', 'celebrate', 'float', 'rod', 'rod_bent'].forEach(k => m.push(['player_' + k, `assets/player/${k}.png`]));
     D.FISH.forEach(f => m.push(['fish_' + f.id, `assets/fish/${D.RARITY[f.rarity].folder}/${f.file}.png`]));
     ['logo', 'title_bg', 'title_bg_portrait', 'btn_primary', 'btn_secondary', 'panel', 'topbar',
-      'card_common', 'card_rare', 'card_exotic', 'card_monster', 'card_fairy'].forEach(k => m.push(['ui_' + k, `assets/ui/${k}.png`]));
+      'card_common', 'card_rare', 'card_exotic', 'card_monster', 'card_fairy', 'btn_sound_on', 'btn_sound_off'].forEach(k => m.push(['ui_' + k, `assets/ui/${k}.png`]));
     D.ACHIEVEMENTS.forEach(a => m.push(['badge_' + a.id, `assets/badge/${a.id}.png`]));
     return m;
   }
@@ -265,7 +274,10 @@
       console.log(`[fishing] 素材 ${manifest().length - missing.size}/${manifest().length} 张已就位，其余用占位图`);
       // 等游戏字体加载好再进标题页，否则第一屏会先用系统字体画（最多等 4 秒）
       const go = () => this.scene.start('Title');
-      if (document.fonts && document.fonts.load) Promise.race([document.fonts.load('48px "ZCOOL KuaiLe"', '四季钓场'), new Promise(r => setTimeout(r, 4000))]).then(go, go);
+      // 圆体按字拆成很多小文件，只下载游戏里出现的字：把源码和数据里的字都喂给 fonts.load，画布绘字前就备齐
+      const bodyChars = () => Promise.all(['src/main.js', 'src/data.js'].map(u => fetch(u).then(r => r.text()).catch(() => '')))
+        .then(ts => document.fonts.load('30px "MaoKenTangYuan (beta)"', [...new Set(ts.join('') + '0123456789kg./:·（）')].join('')));
+      if (document.fonts && document.fonts.load) Promise.race([Promise.all([document.fonts.load('48px "ZCOOL KuaiLe"', '四季钓场'), bodyChars()]), new Promise(r => setTimeout(r, 5000))]).then(go, go);
       else go();
     }
   }
@@ -343,11 +355,11 @@
       const ty = P ? H * 0.28 : 330;
       if (has(this, 'ui_logo')) fit(this.add.image(W / 2, ty, 'ui_logo'), P ? 960 : 900, 450);
       T(this, W / 2, ty, '四季钓场', P ? 170 : 150, '#ffffff', { stroke: '#4a2f17', strokeThickness: 14 }).setOrigin(0.5);
-      T(this, W / 2, ty + (P ? 170 : 150), `本周：${D.SEASON_CN[sc.season]}季 · 此刻：${D.WEATHER_CN[sc.weather]}天`, 42, '#ffffff', { stroke: '#4a2f17', strokeThickness: 6 }).setOrigin(0.5);
+      TB(this, W / 2, ty + (P ? 170 : 150), `本周：${D.SEASON_CN[sc.season]}季 · 此刻：${D.WEATHER_CN[sc.weather]}天`, 42, '#ffffff', { stroke: '#4a2f17', strokeThickness: 6 }).setOrigin(0.5);
       const go = () => { A.unlock(); this.scene.start('Game'); };
       button(this, W / 2, P ? H * 0.55 : 680, P ? 600 : 460, P ? 160 : 130, '开始钓鱼', go);
       const tip = TOUCH ? '按住屏幕蓄力 · 松手抛竿 · 浮标下沉时点一下 · 拉扯时让张力停在绿区' : '按住蓄力 · 松开抛竿 · 浮标下沉时点一下提竿 · 拉扯时让张力停在绿区';
-      T(this, W / 2, P ? H - 160 : H - 70, tip, 30, '#ffffff', { stroke: '#4a2f17', strokeThickness: 5, align: 'center', wordWrap: { width: W - 120, useAdvancedWrap: true } }).setOrigin(0.5);
+      TB(this, W / 2, P ? H - 160 : H - 70, tip, 30, '#ffffff', { stroke: '#4a2f17', strokeThickness: 5, align: 'center', wordWrap: { width: W - 120, useAdvancedWrap: true } }).setOrigin(0.5);
       this.input.keyboard && this.input.keyboard.once('keydown-SPACE', go);
       // 账号入口（没配置 Firebase 时不显示）
       if (window.Store.enabled) {
@@ -382,7 +394,8 @@
       this.time.addEvent({ delay: 110, loop: true, callback: () => this.ripple() });
 
       this.lineG = this.add.graphics().setDepth(20);
-      this.rodG = this.add.graphics().setDepth(22); // 鱼竿在人物前面，才像握在手里
+      this.rodG = this.add.graphics().setDepth(22); // 鱼竿在人物前面，才像握在手里（没有鱼竿素材时用它画）
+      this.rodImg = has(this, 'player_rod') ? this.add.image(0, 0, 'player_rod').setDepth(22) : null;
       this.player = this.add.image(Lx.player.x, Lx.player.y, 'player_idle').setOrigin(0.5, 1).setDisplaySize(Lx.player.size, Lx.player.size).setDepth(21);
       this.float = this.add.image(Lx.rodTip.x, Lx.rodTip.y, 'player_float').setDisplaySize(56, 56).setDepth(19).setVisible(false);
       this.bang = T(this, 0, 0, '！', 96, '#ff3b30', { stroke: '#ffffff', strokeThickness: 10 }).setOrigin(0.5).setDepth(40).setVisible(false);
@@ -390,7 +403,7 @@
       this.barText = this.add.container(0, 0).setDepth(31);
 
       this.buildHud();
-      this.hint = T(this, Lx.W / 2, Lx.hintY, '', 36, '#ffffff', { stroke: '#2a1a0a', strokeThickness: 7, align: 'center', wordWrap: { width: Lx.W - 80, useAdvancedWrap: true } }).setOrigin(0.5).setDepth(50);
+      this.hint = TB(this, Lx.W / 2, Lx.hintY, '', 36, '#ffffff', { stroke: '#2a1a0a', strokeThickness: 7, align: 'center', wordWrap: { width: Lx.W - 80, useAdvancedWrap: true } }).setOrigin(0.5).setDepth(50);
       this.msg = T(this, Lx.W / 2, Lx.msgY, '', Lx.P ? 60 : 72, '#ffffff', { stroke: '#2a1a0a', strokeThickness: 10, align: 'center', wordWrap: { width: Lx.W - 100, useAdvancedWrap: true } }).setOrigin(0.5).setDepth(60).setAlpha(0);
       this.setIdle();
       this.applyScene(true);
@@ -432,7 +445,7 @@
       else { const g = this.add.graphics().setDepth(d); g.fillStyle(0x6b4220, 0.88); g.fillRect(0, 0, W, Lx.hudH); g.fillStyle(0x9a6534, 1); g.fillRect(0, Lx.hudH - 8, W, 8); }
       const tx = Math.max(32, orn - 10);
       this.sceneText = T(this, tx, Lx.P ? 18 : 10, '', Lx.P ? 46 : 42, '#fff6e0', { stroke: '#3a2410', strokeThickness: 6 }).setDepth(d + 1);
-      this.clockText = T(this, tx + 2, Lx.P ? 74 : 62, '', Lx.P ? 26 : 22, '#ffe9c4', { stroke: '#3a2410', strokeThickness: 4 }).setDepth(d + 1);
+      this.clockText = TB(this, tx + 2, Lx.P ? 74 : 62, '', Lx.P ? 26 : 22, '#ffe9c4', { stroke: '#3a2410', strokeThickness: 4 }).setDepth(d + 1);
       const mk = (x, y, w, h, label, fn, sec) => button(this, x, y, w, h, label, fn, { secondary: sec, size: 30 }).setDepth(d + 1);
       if (Lx.P) {
         const y = 172, bw = 196, step = 209, x0 = 22 + bw / 2;
@@ -440,20 +453,34 @@
         mk(x0 + step * 2, y, bw, 84, '图鉴', () => this.openBook());
         mk(x0 + step * 3, y, bw, 84, '成就', () => this.openAch());
         mk(x0 + step * 4, y, bw, 84, '榜单', () => this.openRank());
-        this.muteBtn = mk(W - Math.max(70, orn + 40), 66, 100, 84, '', () => this.toggleMute(), true);
+        this.muteBtn = this.soundButton(W - Math.max(70, orn + 40), 66, 96, mk);
       } else {
         this.waterBtns = { sea: mk(760, 56, 170, 80, '海边', () => this.switchWater('sea'), true), river: mk(950, 56, 170, 80, '河边', () => this.switchWater('river'), true) };
         const r = Math.max(0, orn - 40); // 给右边救生圈让位
         mk(W - 660 - r, 56, 170, 80, '图鉴', () => this.openBook());
         mk(W - 470 - r, 56, 170, 80, '成就', () => this.openAch());
         mk(W - 280 - r, 56, 170, 80, '成就榜', () => this.openRank());
-        this.muteBtn = mk(W - 90 - r, 56, 100, 80, '', () => this.toggleMute(), true);
+        this.muteBtn = this.soundButton(W - 90 - r, 56, 88, mk);
       }
-      this.muteIcon = this.add.graphics(); this.muteBtn.add(this.muteIcon); this.drawMute();
+      this.drawMute();
+    }
+
+    // 声音按钮：有素材就用整颗圆形木按钮图，没有就用普通按钮 + 画的喇叭
+    soundButton(x, y, size, mk) {
+      if (has(this, 'ui_btn_sound_on')) {
+        const img = this.add.image(x, y, 'ui_btn_sound_on').setDisplaySize(size, size).setDepth(101).setInteractive({ useHandCursor: true });
+        img.on('pointerdown', () => { A.unlock(); A.play('click'); this.toggleMute(); });
+        if (!TOUCH) { img.on('pointerover', () => img.setDisplaySize(size * 1.06, size * 1.06)); img.on('pointerout', () => img.setDisplaySize(size, size)); }
+        return img;
+      }
+      const b = mk(x, y, size + 4, size - 12, '', () => this.toggleMute(), true);
+      this.muteIcon = this.add.graphics(); b.add(this.muteIcon);
+      return b;
     }
 
     // 声音按钮画成喇叭图标（emoji 和游戏画风不搭）
     drawMute() {
+      if (!this.muteIcon) { this.muteBtn.setTexture(A.isMuted() ? 'ui_btn_sound_off' : 'ui_btn_sound_on'); return; }
       const g = this.muteIcon, m = A.isMuted(); g.clear(); this.muteBtn.label.setText('');
       g.lineStyle(5, 0x6b4220, 1); g.fillStyle(0xffffff, 1);
       const body = [{ x: -24, y: -9 }, { x: -12, y: -9 }, { x: 2, y: -22 }, { x: 2, y: 22 }, { x: -12, y: 9 }, { x: -24, y: 9 }];
@@ -675,6 +702,12 @@
     rodGeom() {
       const Lx = this.Lx, S = Lx.player.size, p = POSE[this.player.texture.key] || POSE.player_idle;
       const hand = { x: Lx.player.x + (p.hand[0] / 512 - 0.5) * S, y: Lx.player.y - S + p.hand[1] / 512 * S };
+      if (this.rodImg) { // 鱼竿素材：按姿势方向旋转，长度比原来的线长一点
+        const key = this.state === 'reeling' && has(this, 'player_rod_bent') ? 'player_rod_bent' : 'player_rod', R = ROD_IMG[key];
+        const ang = Math.atan2(p.rod[1], p.rod[0]), k = Math.hypot(p.rod[0], p.rod[1]) * S * 1.12 / (ROD_IMG.player_rod.tip[0] - R.grip[0]);
+        const lx = (R.tip[0] - R.grip[0]) * k, ly = (R.tip[1] - R.grip[1]) * k, c = Math.cos(ang), sn = Math.sin(ang);
+        return { hand, key, ang, k, R, tip: { x: hand.x + lx * c - ly * sn, y: hand.y + lx * sn + ly * c } };
+      }
       const bend = this.state === 'reeling' ? 30 + this.reel.tension * 50 : 0;
       const end = { x: hand.x + p.rod[0] * S, y: hand.y + p.rod[1] * S };
       return { hand, butt: { x: hand.x - p.rod[0] * S * 0.16, y: hand.y - p.rod[1] * S * 0.16 }, end, tip: { x: end.x + bend, y: end.y + bend * 1.4 } };
@@ -682,12 +715,17 @@
 
     drawLine() {
       const g = this.lineG, r = this.rodGeom(), tip = r.tip, rg = this.rodG; g.clear(); rg.clear();
+      if (this.rodImg) {
+        if (this.rodImg.texture.key !== r.key) this.rodImg.setTexture(r.key);
+        this.rodImg.setOrigin(r.R.grip[0] / r.R.w, r.R.grip[1] / r.R.h).setPosition(r.hand.x, r.hand.y).setRotation(r.ang).setScale(r.k);
+      } else {
       const ctrl = new Phaser.Math.Vector2((r.hand.x + r.end.x) / 2, (r.hand.y + r.end.y) / 2);
       const pts = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(r.butt.x, r.butt.y), ctrl, new Phaser.Math.Vector2(tip.x, tip.y)).getPoints(16);
       rg.lineStyle(12, 0x3a2410, 1); rg.strokePoints(pts);          // 描边
       rg.lineStyle(7, 0x9a6232, 1); rg.strokePoints(pts);           // 竿身
       rg.lineStyle(13, 0x2a1a0a, 1); rg.lineBetween(r.butt.x, r.butt.y, r.butt.x + (r.hand.x - r.butt.x) * 1.5, r.butt.y + (r.hand.y - r.butt.y) * 1.5); // 握把
       rg.fillStyle(0xd9a740, 1); rg.fillCircle(r.hand.x - (r.hand.x - r.butt.x) * 0.3, r.hand.y - (r.hand.y - r.butt.y) * 0.3, 7); // 绕线轮
+      }
       if (!this.float.visible) return;
       const sag = this.state === 'reeling' ? 80 * (1 - this.reel.tension) : 120;
       const color = this.state === 'reeling' && this.reel.tension > this.reel.hi ? 0xff6b5e : 0xffffff;
@@ -726,7 +764,7 @@
         this.tweens.add({ targets: s, y: s.y - Phaser.Math.Between(150, 400), alpha: { from: 1, to: 0 }, angle: 180, duration: 1800, delay: i * 50 });
       }
       const line = big ? '凡人，你唤醒了水之女神。' : '凡人，你钓到本仙了～';
-      const bubble = T(this, x, y - (big ? 640 : 500), line, 46, big ? '#0b6e99' : '#c2185b', { backgroundColor: '#fffaf0', padding: { x: 24, y: 14 } }).setOrigin(0.5).setDepth(48).setAlpha(0);
+      const bubble = TB(this, x, y - (big ? 640 : 500), line, 46, big ? '#0b6e99' : '#c2185b', { backgroundColor: '#fffaf0', padding: { x: 24, y: 14 } }).setOrigin(0.5).setDepth(48).setAlpha(0);
       this.tweens.add({ targets: bubble, alpha: 1, delay: big ? 1900 : 1300, duration: 300 });
       this.time.delayedCall(big ? 4600 : 3300, () => { [glow, f, bubble].forEach(o => o.destroy()); if (big) this.dim.setFillStyle(0x1a2a3a, this.sc.weather === 'rainy' ? 0.28 : 0); done(); });
     }
@@ -743,7 +781,7 @@
       o.add(img);
       this.tweens.add({ targets: img, y: img.y - 15, yoyo: true, repeat: -1, duration: 900, ease: 'Sine.InOut' });
       o.add(T(this, W / 2, at(P ? 0.65 : 0.69), fish.name, P ? 64 : 56, INK).setOrigin(0.5));
-      o.add(T(this, W / 2, at(P ? 0.72 : 0.77), `${R.cn} · ${fmtW(weight)}`, P ? 40 : 34, HEX(R.color)).setOrigin(0.5));
+      o.add(TB(this, W / 2, at(P ? 0.72 : 0.77), `${R.cn} · ${fmtW(weight)}`, P ? 40 : 34, HEX(R.color)).setOrigin(0.5));
       const tags = [];
       if (res.isNew) tags.push('首次钓到 · 图鉴已解锁');
       if (res.isRecord) tags.push('新纪录！');
@@ -824,7 +862,7 @@
       const per = cols * rows, pages = Math.ceil(list.length / per);
       page = Math.min(page, pages - 1);
       const gx = W / 2 - (cols * sx - (sx - cw)) / 2 + cw / 2;
-      const detail = T(this, W / 2, b.bottom - 58, '点一张已解锁的卡片看详情', 30, '#7a5a3a', { align: 'center', wordWrap: { width: b.w - 100, useAdvancedWrap: true } }).setOrigin(0.5);
+      const detail = TB(this, W / 2, b.bottom - 58, '点一张已解锁的卡片看详情', 30, '#7a5a3a', { align: 'center', wordWrap: { width: b.w - 100, useAdvancedWrap: true } }).setOrigin(0.5);
       list.slice(page * per, page * per + per).forEach((f, i) => {
         const cx = gx + (i % cols) * sx, cy = gridTop + ch / 2 + Math.floor(i / cols) * sy;
         const got = this.save.book[f.id], R = D.RARITY[f.rarity];
@@ -846,7 +884,7 @@
       o.add(detail);
       if (pages > 1) {
         const px = P ? W / 2 : b.right - 200, py = P ? b.bottom - 150 : ty;
-        o.add(T(this, px, py, `${page + 1} / ${pages}`, 30, INK).setOrigin(0.5));
+        o.add(TB(this, px, py, `${page + 1} / ${pages}`, 30, INK).setOrigin(0.5));
         if (page > 0) o.add(button(this, px - 110, py, 90, 70, '‹', () => this.openBook(tab, page - 1), { size: 44 }));
         if (page < pages - 1) o.add(button(this, px + 110, py, 90, 70, '›', () => this.openBook(tab, page + 1), { size: 44 }));
       }
@@ -859,7 +897,7 @@
       const st = L.stats(this.save);
       const doneN = D.ACHIEVEMENTS.filter(a => this.save.ach[a.id]).length;
       o.add(T(this, b.left + 50, b.top + 30, `成就  ${doneN} / ${D.ACHIEVEMENTS.length}`, 48, INK));
-      o.add(T(this, b.left + 50, b.top + 95, `成就点数 ${st.points} / ${st.maxPoints}`, 32, '#7a5a3a'));
+      o.add(TB(this, b.left + 50, b.top + 95, `成就点数 ${st.points} / ${st.maxPoints}`, 32, '#7a5a3a'));
       const cols = P ? 1 : 2, startY = b.top + 230, step = Math.min(170, (b.bottom - 60 - startY) / Math.ceil(D.ACHIEVEMENTS.length / cols));
       const colW = (b.w - 100) / cols;
       D.ACHIEVEMENTS.forEach((a, i) => {
@@ -869,8 +907,8 @@
         if (!done) badge.setTint(0x777777).setAlpha(0.6);
         o.add(badge);
         o.add(T(this, x + 85, y - 54, a.name, 36, done ? INK : '#8a8a8a'));
-        o.add(T(this, x + 85, y - 8, a.cond, 26, '#7a5a3a'));
-        o.add(T(this, x + 85, y + 28, done ? `已达成 ${new Date(done).toLocaleDateString('zh-CN')}  +${a.points}` : `未达成 · ${a.points} 点`, 24, done ? '#2e8b3e' : '#9a9a9a'));
+        o.add(TB(this, x + 85, y - 8, a.cond, 26, '#7a5a3a'));
+        o.add(TB(this, x + 85, y + 28, done ? `已达成 ${new Date(done).toLocaleDateString('zh-CN')}  +${a.points}` : `未达成 · ${a.points} 点`, 24, done ? '#2e8b3e' : '#9a9a9a'));
       });
     }
 
@@ -883,7 +921,7 @@
       const byId = Object.fromEntries(D.FISH.map(f => [f.id, f]));
       o.add(T(this, b.left + 50, b.top + 30, '我的成就榜', 48, INK));
       const where = SS.user ? `${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端' : '成绩只存在这台设备';
-      o.add(T(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));
+      o.add(TB(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));
       if (SS.enabled) o.add(button(this, b.right - 56 - 60 - (P ? 130 : 150), b.top + 56, P ? 260 : 300, 80, SS.user ? '账号' : '登录 / 注册', () => window.AccountUI.open(), { secondary: true, size: 30 }));
       const best = st.top[0];
       const cards = [['成就点数', `${st.points}`, `/ ${st.maxPoints}`], ['图鉴完成度', `${Math.round(st.found / st.totalFish * 100)}%`, `${st.found} / ${st.totalFish}`],
@@ -894,9 +932,9 @@
         const cx = cx0 + i * (cw + cgap);
         const g = this.add.graphics(); g.fillStyle(0xffffff, 1); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 24); g.lineStyle(5, 0xd9a740, 1); g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 24);
         o.add(g);
-        o.add(T(this, cx, cy - 58, t, 28, '#7a5a3a').setOrigin(0.5));
-        o.add(T(this, cx, cy + 4, v, P ? 50 : 60, INK).setOrigin(0.5));
-        o.add(T(this, cx, cy + 62, s, 26, '#9a7a5a').setOrigin(0.5));
+        o.add(TB(this, cx, cy - 58, t, 28, '#7a5a3a').setOrigin(0.5));
+        o.add(TB(this, cx, cy + 4, v, P ? 50 : 60, INK).setOrigin(0.5));
+        o.add(TB(this, cx, cy + 62, s, 26, '#9a7a5a').setOrigin(0.5));
       });
       // 榜单区域：放进可滑动的容器（手指拖动 / 鼠标滚轮），超出面板的部分用遮罩裁掉
       const top = cy + 120, bottom = b.bottom - (P ? 40 : 60), view = bottom - top; // 底部避开面板花边
@@ -904,11 +942,11 @@
       let contentH = 0;
       const listAt = (x, y, title, rows, empty, wdt) => {
         box.add(T(this, x, y, title, 36, INK));
-        if (!rows.length) box.add(T(this, x, y + 60, empty, 30, '#9a9a9a'));
+        if (!rows.length) box.add(TB(this, x, y + 60, empty, 30, '#9a9a9a'));
         rows.forEach((c, i) => {
           const ry = y + 60 + i * 46;
-          box.add(T(this, x, ry, `${i + 1}. ${byId[c.id].name}`, 30, i < 3 ? '#c0731c' : INK));
-          box.add(T(this, x + wdt, ry, fmtW(c.w), 30, INK).setOrigin(1, 0));
+          box.add(TB(this, x, ry, `${i + 1}. ${byId[c.id].name}`, 30, i < 3 ? '#c0731c' : INK));
+          box.add(TB(this, x + wdt, ry, fmtW(c.w), 30, INK).setOrigin(1, 0));
         });
         contentH = Math.max(contentH, y - top + 60 + Math.max(1, rows.length) * 46 + 20);
       };
@@ -936,7 +974,6 @@
         zone.on('pointerdown', p => { startY = p.y; startBox = box.y; });
         zone.on('pointermove', p => { if (p.isDown) setY(startBox + (p.y - startY)); });
         zone.on('wheel', (p, dx, dy) => setY(box.y - dy));
-        o.add(T(this, b.right - 40, top - 2, '上下滑动查看更多', 22, '#9a7a5a').setOrigin(1, 1));
       }
     }
   }

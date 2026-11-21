@@ -1,0 +1,6 @@
+猫啃网糖圆体 MaoKen TangYuan (beta)
+Copyright (c) 2020 Maoken, NFSL2001. Redistributed by maoken.com under the SIL Open Font License 1.1,
+with Reserved Font Names 'TangYuan' and 'Tang Yuan'.
+Based on jf open huninn (SIL OFL 1.1, justfont CO.,LTD), Varela Round (SIL OFL 1.1) and
+Kosugi Maru (Apache License 2.0, MOTOYA CO.,LTD.).
+Web font split by cn-font-split (chinese-fonts project). Full OFL text: https://openfontlicense.org
