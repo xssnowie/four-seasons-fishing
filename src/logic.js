@@ -20,10 +20,14 @@
     const week = Math.floor((now - EPOCH) / WEEK);
     const season = D.SEASONS[((week % 4) + 4) % 4];
     const hour = Math.floor(now / HOUR);
-    const weather = hash32(hour) < RAIN_CHANCE ? 'rainy' : 'sunny';
+    const wx = h => (hash32(h) < RAIN_CHANCE ? 'rainy' : 'sunny');
+    const weather = wx(hour);
+    // 天气每小时抽一次，可能连着几小时都一样：倒计时指向「真正会变天」的那个整点（最多往后看 3 天）
+    let next = hour + 1;
+    while (next < hour + 72 && wx(next) === weather) next++;
     return {
       season, weather,
-      nextWeatherIn: (hour + 1) * HOUR - now,
+      nextWeatherIn: next * HOUR - now,
       nextSeasonIn: EPOCH + (week + 1) * WEEK - now,
     };
   }

@@ -2,12 +2,9 @@
 // 素材缺失时自动生成占位图，放进 assets/ 对应文件名即自动替换。
 (function () {
   const D = window.GameData, L = window.GameLogic, A = window.GameAudio;
-  const FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif';
+  const FONT = '"ZCOOL KuaiLe","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif'; // 站酷快乐体（assets/font，OFL 授权）
   const INK = '#4a2f17';
-  const SEASON_EMOJI = { spring: '🌸', summer: '☀️', autumn: '🍁', winter: '❄️' };
-  const WEATHER_EMOJI = { sunny: '☀️', rainy: '🌧️' };
-  const WATER_EMOJI = { sea: '🌊', river: '🏞️' };
-  const HEX = n => '#' + n.toString(16).padStart(6, '0');
+    const HEX = n => '#' + n.toString(16).padStart(6, '0');
   const TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   const MIN_FONT = TOUCH ? 30 : 22; // 手机上画布缩得厉害，字不能太小
 
@@ -30,7 +27,8 @@
     if (P) {
       o.player = { x: 230, y: H - 190, size: 300 };
       o.rodTip = { x: 390, y: H - 560 };
-      o.far = d => ({ x: 560 + d * 320, y: H - 800 - d * H * 0.28 });
+      const s = Math.max(W / 1080, H / 1920), bx = f => f * 1080 * s, by = f => H - (1 - f) * 1920 * s; // 竖屏背景 1080×1920，cover + 左下对齐
+      o.far = d => ({ x: Math.min(W - 90, bx(0.58 + 0.22 * d)), y: by(0.62 - 0.12 * d) });
       o.tension = { x: W - 108, top: Math.round(H * 0.27), h: Math.round(H * 0.36), w: 52 };
       o.progress = { cx: W / 2, y: hudH + 78, w: 760 };
       o.charge = { cx: W / 2, y: hudH + 80, w: 560 };
@@ -52,6 +50,15 @@
     return o;
   }
 
+  // 各姿势的拳头位置（512×512 素材里的像素）和鱼竿方向（以人物显示尺寸为单位）
+  const POSE = {
+    player_idle: { hand: [365, 288], rod: [0.36, -0.77] },
+    player_cast: { hand: [394, 173], rod: [0.20, -0.83] },
+    player_wait: { hand: [352, 307], rod: [0.55, -0.62] },
+    player_reel: { hand: [353, 252], rod: [0.62, -0.50] },
+    player_celebrate: { hand: [387, 128], rod: [0.25, -0.80] },
+  };
+
   // 背景图（cover，左下对齐）坐标 → 画面坐标
   function bgMap(L0, tex) {
     const iw = tex.getSourceImage().width, ih = tex.getSourceImage().height;
@@ -69,7 +76,7 @@
   }
   function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; }
   function fmtW(w) { return w >= 1000 ? (w / 1000).toFixed(2) + ' 吨' : w.toFixed(2) + ' kg'; }
-  function mmss(ms) { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function mmss(ms) { const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, p2 = n => String(n).padStart(2, '0'); return (h ? h + ':' + p2(m) : m) + ':' + p2(s % 60); }
   function sceneLabel(sc) { return `${D.SEASON_CN[sc.season]} · ${D.WEATHER_CN[sc.weather]} · ${D.WATER_CN[sc.water]}`; }
   function condText(f) {
     if (f.rarity === 'goddess') return '任何场景（极低概率）';
@@ -256,7 +263,10 @@
       makeSimple(this, 'drop', 'drop');
       this.registry.set('missing', missing);
       console.log(`[fishing] 素材 ${manifest().length - missing.size}/${manifest().length} 张已就位，其余用占位图`);
-      this.scene.start('Title');
+      // 等游戏字体加载好再进标题页，否则第一屏会先用系统字体画（最多等 4 秒）
+      const go = () => this.scene.start('Title');
+      if (document.fonts && document.fonts.load) Promise.race([document.fonts.load('48px "ZCOOL KuaiLe"', '四季钓场'), new Promise(r => setTimeout(r, 4000))]).then(go, go);
+      else go();
     }
   }
 
@@ -347,7 +357,7 @@
       }
     }
   }
-  function acctLabel() { const S = window.Store; return !S.ready ? '👤 账号' : S.user ? `👤 ${S.user.name}` : '👤 登录 / 注册 存进度'; }
+  function acctLabel() { const S = window.Store; return !S.ready ? '账号' : S.user ? `账号：${S.user.name}` : '登录 / 注册 · 存进度'; }
 
   // ---------------- 钓鱼主场景 ----------------
   class Game extends Phaser.Scene {
@@ -372,6 +382,7 @@
       this.time.addEvent({ delay: 110, loop: true, callback: () => this.ripple() });
 
       this.lineG = this.add.graphics().setDepth(20);
+      this.rodG = this.add.graphics().setDepth(22); // 鱼竿在人物前面，才像握在手里
       this.player = this.add.image(Lx.player.x, Lx.player.y, 'player_idle').setOrigin(0.5, 1).setDisplaySize(Lx.player.size, Lx.player.size).setDepth(21);
       this.float = this.add.image(Lx.rodTip.x, Lx.rodTip.y, 'player_float').setDisplaySize(56, 56).setDepth(19).setVisible(false);
       this.bang = T(this, 0, 0, '！', 96, '#ff3b30', { stroke: '#ffffff', strokeThickness: 10 }).setOrigin(0.5).setDepth(40).setVisible(false);
@@ -425,26 +436,36 @@
       const mk = (x, y, w, h, label, fn, sec) => button(this, x, y, w, h, label, fn, { secondary: sec, size: 30 }).setDepth(d + 1);
       if (Lx.P) {
         const y = 172, bw = 196, step = 209, x0 = 22 + bw / 2;
-        this.waterBtns = { sea: mk(x0, y, bw, 84, '🌊 海', () => this.switchWater('sea'), true), river: mk(x0 + step, y, bw, 84, '🏞️ 河', () => this.switchWater('river'), true) };
-        mk(x0 + step * 2, y, bw, 84, '📖 图鉴', () => this.openBook());
-        mk(x0 + step * 3, y, bw, 84, '🏆 成就', () => this.openAch());
-        mk(x0 + step * 4, y, bw, 84, '📊 榜单', () => this.openRank());
+        this.waterBtns = { sea: mk(x0, y, bw, 84, '海边', () => this.switchWater('sea'), true), river: mk(x0 + step, y, bw, 84, '河边', () => this.switchWater('river'), true) };
+        mk(x0 + step * 2, y, bw, 84, '图鉴', () => this.openBook());
+        mk(x0 + step * 3, y, bw, 84, '成就', () => this.openAch());
+        mk(x0 + step * 4, y, bw, 84, '榜单', () => this.openRank());
         this.muteBtn = mk(W - Math.max(70, orn + 40), 66, 100, 84, '', () => this.toggleMute(), true);
       } else {
-        this.waterBtns = { sea: mk(760, 56, 170, 80, '🌊 海', () => this.switchWater('sea'), true), river: mk(950, 56, 170, 80, '🏞️ 河', () => this.switchWater('river'), true) };
+        this.waterBtns = { sea: mk(760, 56, 170, 80, '海边', () => this.switchWater('sea'), true), river: mk(950, 56, 170, 80, '河边', () => this.switchWater('river'), true) };
         const r = Math.max(0, orn - 40); // 给右边救生圈让位
-        mk(W - 660 - r, 56, 170, 80, '📖 图鉴', () => this.openBook());
-        mk(W - 470 - r, 56, 170, 80, '🏆 成就', () => this.openAch());
-        mk(W - 280 - r, 56, 170, 80, '📊 成就榜', () => this.openRank());
+        mk(W - 660 - r, 56, 170, 80, '图鉴', () => this.openBook());
+        mk(W - 470 - r, 56, 170, 80, '成就', () => this.openAch());
+        mk(W - 280 - r, 56, 170, 80, '成就榜', () => this.openRank());
         this.muteBtn = mk(W - 90 - r, 56, 100, 80, '', () => this.toggleMute(), true);
       }
-      this.muteBtn.label.setText(A.isMuted() ? '🔇' : '🔊');
+      this.muteIcon = this.add.graphics(); this.muteBtn.add(this.muteIcon); this.drawMute();
     }
 
-    toggleMute() { A.setMuted(!A.isMuted()); this.muteBtn.label.setText(A.isMuted() ? '🔇' : '🔊'); }
+    // 声音按钮画成喇叭图标（emoji 和游戏画风不搭）
+    drawMute() {
+      const g = this.muteIcon, m = A.isMuted(); g.clear(); this.muteBtn.label.setText('');
+      g.lineStyle(5, 0x6b4220, 1); g.fillStyle(0xffffff, 1);
+      const body = [{ x: -24, y: -9 }, { x: -12, y: -9 }, { x: 2, y: -22 }, { x: 2, y: 22 }, { x: -12, y: 9 }, { x: -24, y: 9 }];
+      g.fillPoints(body, true); g.strokePoints(body, true);
+      if (m) { g.lineStyle(6, 0xffffff, 1); g.lineBetween(12, -10, 30, 10); g.lineBetween(30, -10, 12, 10); g.lineStyle(2, 0x6b4220, 1); }
+      else { g.lineStyle(5, 0xffffff, 1); g.beginPath(); g.arc(4, 0, 13, -0.8, 0.8); g.strokePath(); g.beginPath(); g.arc(4, 0, 24, -0.8, 0.8); g.strokePath(); }
+    }
+
+    toggleMute() { A.setMuted(!A.isMuted()); this.drawMute(); }
 
     refreshHud() {
-      this.sceneText.setText(`${SEASON_EMOJI[this.sc.season]}${WEATHER_EMOJI[this.sc.weather]}${WATER_EMOJI[this.water]}  ${sceneLabel(this.sc)}`);
+      this.sceneText.setText(sceneLabel(this.sc));
       ['sea', 'river'].forEach(w => this.waterBtns[w].setAlpha(w === this.water ? 1 : 0.55));
     }
 
@@ -518,7 +539,7 @@
     cast() {
       this.state = 'casting';
       this.barG.clear(); this.barText.removeAll(true); this.chargeLabel = false;
-      const d = this.charge, tip = this.Lx.rodTip;
+      const d = this.charge, tip = this.rodGeom().tip;
       this.hook = this.rollFish(d);
       const tgt = this.floatHome = this.floatTarget(d);
       this.player.setTexture('player_wait');
@@ -584,7 +605,7 @@
     }
 
     endCast() {
-      const tip = this.Lx.rodTip;
+      const tip = this.rodGeom().tip;
       this.tweens.add({ targets: this.float, x: tip.x, y: tip.y, duration: 300, onComplete: () => this.setIdle() });
       this.state = 'retrieving'; this.bang.setVisible(false); this.barG.clear(); this.barText.removeAll(true);
     }
@@ -599,7 +620,7 @@
     }
 
     updateReel(dt, time) {
-      const r = this.reel, tip = this.Lx.rodTip;
+      const r = this.reel, tip = this.rodGeom().tip;
       r.phase += dt;
       r.tension += (this.holding ? 0.75 : -0.6) * dt;
       r.tension += r.strength * (0.35 * Math.sin(r.phase * 2.3) + 0.25 * Math.sin(r.phase * 5.1 + 1)) * dt;
@@ -648,13 +669,23 @@
       g.fillStyle(inZone ? 0xffd23f : 0xb8a070, 1); g.fillRoundedRect(px, p.y, Math.max(10, p.w * r.progress), ph, 10);
     }
 
+    // 鱼竿几何：手柄尾端（拳头后面一点）→ 拳头 → 竿尖；收线时按张力往下弯
+    rodGeom() {
+      const Lx = this.Lx, S = Lx.player.size, p = POSE[this.player.texture.key] || POSE.player_idle;
+      const hand = { x: Lx.player.x + (p.hand[0] / 512 - 0.5) * S, y: Lx.player.y - S + p.hand[1] / 512 * S };
+      const bend = this.state === 'reeling' ? 30 + this.reel.tension * 50 : 0;
+      const end = { x: hand.x + p.rod[0] * S, y: hand.y + p.rod[1] * S };
+      return { hand, butt: { x: hand.x - p.rod[0] * S * 0.16, y: hand.y - p.rod[1] * S * 0.16 }, end, tip: { x: end.x + bend, y: end.y + bend * 1.4 } };
+    }
+
     drawLine() {
-      const g = this.lineG, Lx = this.Lx, tipBase = Lx.rodTip; g.clear();
-      const hand = { x: Lx.player.x + 60, y: Lx.player.y - Lx.player.size * 0.52 };
-      const bend = this.state === 'reeling' ? 40 + this.reel.tension * 60 : 0;
-      const tip = { x: tipBase.x + bend, y: tipBase.y + bend };
-      g.lineStyle(9, 0x7a4d22, 1);
-      g.strokePoints(new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(hand.x, hand.y), new Phaser.Math.Vector2((hand.x + tipBase.x) / 2 + bend * 0.3, (hand.y + tipBase.y) / 2 - 20), new Phaser.Math.Vector2(tip.x, tip.y)).getPoints(16));
+      const g = this.lineG, r = this.rodGeom(), tip = r.tip, rg = this.rodG; g.clear(); rg.clear();
+      const ctrl = new Phaser.Math.Vector2((r.hand.x + r.end.x) / 2, (r.hand.y + r.end.y) / 2);
+      const pts = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(r.butt.x, r.butt.y), ctrl, new Phaser.Math.Vector2(tip.x, tip.y)).getPoints(16);
+      rg.lineStyle(12, 0x3a2410, 1); rg.strokePoints(pts);          // 描边
+      rg.lineStyle(7, 0x9a6232, 1); rg.strokePoints(pts);           // 竿身
+      rg.lineStyle(13, 0x2a1a0a, 1); rg.lineBetween(r.butt.x, r.butt.y, r.butt.x + (r.hand.x - r.butt.x) * 1.5, r.butt.y + (r.hand.y - r.butt.y) * 1.5); // 握把
+      rg.fillStyle(0xd9a740, 1); rg.fillCircle(r.hand.x - (r.hand.x - r.butt.x) * 0.3, r.hand.y - (r.hand.y - r.butt.y) * 0.3, 7); // 绕线轮
       if (!this.float.visible) return;
       const sag = this.state === 'reeling' ? 80 * (1 - this.reel.tension) : 120;
       const color = this.state === 'reeling' && this.reel.tension > this.reel.hi ? 0xff6b5e : 0xffffff;
@@ -700,7 +731,7 @@
 
     showResult(fish, weight, res) {
       const R = D.RARITY[fish.rarity], P = this.Lx.P, W = this.Lx.W;
-      const titles = { common: '钓到了！', rare: '稀有鱼！', exotic: '奇珍异兽出现！', monster: '怪兽被你钓起来了！！', fairy: '✨ 小隐藏 · 四季小仙女 ✨', goddess: '🌊 大隐藏 · 水之女神 🌊' };
+      const titles = { common: '钓到了！', rare: '稀有鱼！', exotic: '奇珍异兽出现！', monster: '怪兽被你钓起来了！！', fairy: '小隐藏 · 四季小仙女', goddess: '大隐藏 · 水之女神' };
       const pw = P ? 960 : 900, ph = P ? 1060 : 700;
       const o = this.openOverlay(pw, ph, 'ui_panel', () => this.setIdle());
       const top = this.Lx.oy - ph / 2, at = f => top + ph * f;
@@ -713,7 +744,7 @@
       o.add(T(this, W / 2, at(P ? 0.72 : 0.77), `${R.cn} · ${fmtW(weight)}`, P ? 40 : 34, HEX(R.color)).setOrigin(0.5));
       const tags = [];
       if (res.isNew) tags.push('首次钓到 · 图鉴已解锁');
-      if (res.isRecord) tags.push('🎉 新纪录！');
+      if (res.isRecord) tags.push('新纪录！');
       if (tags.length) o.add(T(this, W / 2, at(P ? 0.78 : 0.84), tags.join('  '), P ? 36 : 32, '#e07b00').setOrigin(0.5));
       o.add(button(this, W / 2, at(P ? 0.88 : 0.95) - (P ? 0 : 20), P ? 440 : 340, P ? 110 : 90, '继续钓鱼', () => this.closeOverlay()));
       res.newAch.forEach(a => this.toast(a));
@@ -778,7 +809,7 @@
       tab = tab || 'sea'; page = page || 0;
       const b = this.sheet(), o = b.o, P = this.Lx.P, W = this.Lx.W;
       const found = D.FISH.filter(f => this.save.book[f.id]).length;
-      o.add(T(this, b.left + 50, b.top + 30, `📖 图鉴  ${found} / ${D.FISH.length}`, 48, INK));
+      o.add(T(this, b.left + 50, b.top + 30, `图鉴  ${found} / ${D.FISH.length}`, 48, INK));
       const TABS = [['sea', '普通·海', f => f.rarity === 'common' && f.water === 'sea'], ['river', '普通·河', f => f.rarity === 'common' && f.water === 'river'],
         ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·隐藏', f => f.rarity === 'monster' || f.rarity === 'fairy' || f.rarity === 'goddess']];
       const tw = P ? 182 : 230, tstep = P ? 192 : 250, ty = b.top + (P ? 128 : 112);
@@ -798,10 +829,10 @@
         const ck = 'ui_card_' + (f.rarity === 'goddess' ? 'fairy' : f.rarity);
         if (has(this, ck)) o.add(this.add.image(cx, cy, ck).setDisplaySize(cw, ch));
         else { const g = this.add.graphics(); g.fillStyle(0xffffff, 1); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18); g.lineStyle(6, R.color, 1); g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18); o.add(g); }
-        const img = fit(this.add.image(cx, cy - 20, 'fish_' + f.id), 130, 115);
+        const img = fit(this.add.image(cx, cy + 3, 'fish_' + f.id), 132, 104); // 卡片窗口：素材 280 高里的 58–234 像素
         if (!got) img.setTintFill(0x3a3a4a);
         o.add(img);
-        o.add(T(this, cx, cy + 66, got ? f.name : '???', 24, got ? INK : '#9a9a9a').setOrigin(0.5));
+        o.add(T(this, cx, cy + 75, got ? f.name : '???', 26, '#ffffff', { stroke: got ? '#4a2f17' : '#7a7a86', strokeThickness: 6 }).setOrigin(0.5));
         const hit = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true });
         hit.on('pointerdown', () => {
           A.play('click');
@@ -825,7 +856,7 @@
       const b = this.sheet(), o = b.o, P = this.Lx.P;
       const st = L.stats(this.save);
       const doneN = D.ACHIEVEMENTS.filter(a => this.save.ach[a.id]).length;
-      o.add(T(this, b.left + 50, b.top + 30, `🏆 成就  ${doneN} / ${D.ACHIEVEMENTS.length}`, 48, INK));
+      o.add(T(this, b.left + 50, b.top + 30, `成就  ${doneN} / ${D.ACHIEVEMENTS.length}`, 48, INK));
       o.add(T(this, b.left + 50, b.top + 95, `成就点数 ${st.points} / ${st.maxPoints}`, 32, '#7a5a3a'));
       const cols = P ? 1 : 2, startY = b.top + 230, step = Math.min(170, (b.bottom - 60 - startY) / Math.ceil(D.ACHIEVEMENTS.length / cols));
       const colW = (b.w - 100) / cols;
@@ -837,7 +868,7 @@
         o.add(badge);
         o.add(T(this, x + 85, y - 54, a.name, 36, done ? INK : '#8a8a8a'));
         o.add(T(this, x + 85, y - 8, a.cond, 26, '#7a5a3a'));
-        o.add(T(this, x + 85, y + 28, done ? `✔ 已达成 ${new Date(done).toLocaleDateString('zh-CN')}  +${a.points}` : `未达成 · ${a.points} 点`, 24, done ? '#2e8b3e' : '#9a9a9a'));
+        o.add(T(this, x + 85, y + 28, done ? `已达成 ${new Date(done).toLocaleDateString('zh-CN')}  +${a.points}` : `未达成 · ${a.points} 点`, 24, done ? '#2e8b3e' : '#9a9a9a'));
       });
     }
 
@@ -848,10 +879,10 @@
       this.overlayKind = 'rank';
       const st = L.stats(this.save);
       const byId = Object.fromEntries(D.FISH.map(f => [f.id, f]));
-      o.add(T(this, b.left + 50, b.top + 30, '📊 我的成就榜', 48, INK));
-      const where = SS.user ? `👤 ${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端' : '成绩只存在这台设备';
+      o.add(T(this, b.left + 50, b.top + 30, '我的成就榜', 48, INK));
+      const where = SS.user ? `${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端' : '成绩只存在这台设备';
       o.add(T(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));
-      if (SS.enabled) o.add(button(this, b.right - 56 - 60 - (P ? 130 : 150), b.top + 56, P ? 260 : 300, 80, SS.user ? '👤 账号' : '👤 登录/注册', () => window.AccountUI.open(), { secondary: true, size: 30 }));
+      if (SS.enabled) o.add(button(this, b.right - 56 - 60 - (P ? 130 : 150), b.top + 56, P ? 260 : 300, 80, SS.user ? '账号' : '登录 / 注册', () => window.AccountUI.open(), { secondary: true, size: 30 }));
       const best = st.top[0];
       const cards = [['成就点数', `${st.points}`, `/ ${st.maxPoints}`], ['图鉴完成度', `${Math.round(st.found / st.totalFish * 100)}%`, `${st.found} / ${st.totalFish}`],
         ['最大一条', best ? fmtW(best.w) : '—', best ? byId[best.id].name : '还没钓到']];
@@ -875,11 +906,11 @@
         });
       };
       if (P) {
-        listAt(b.left + 70, cy + 150, '🐟 最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', b.w - 140);
-        listAt(b.left + 70, cy + 150 + 80 + Math.max(1, st.top.length) * 46 + 40, '🐉 怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', b.w - 140);
+        listAt(b.left + 70, cy + 150, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', b.w - 140);
+        listAt(b.left + 70, cy + 150 + 80 + Math.max(1, st.top.length) * 46 + 40, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', b.w - 140);
       } else {
-        listAt(b.left + 80, cy + 150, '🐟 最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', 620);
-        listAt(this.Lx.W / 2 + 60, cy + 150, '🐉 怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', 620);
+        listAt(b.left + 80, cy + 150, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', 620);
+        listAt(this.Lx.W / 2 + 60, cy + 150, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', 620);
       }
     }
   }

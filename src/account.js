@@ -8,7 +8,7 @@
     kids.flat().forEach(c => n.append(c));
     return n;
   };
-  const STATUS = { idle: '', syncing: '☁️ 正在同步…', ok: '☁️ 进度已存到云端', offline: '⚠️ 暂时连不上网络，进度先存在本机，连上后会自动同步' };
+  const STATUS = { idle: '', syncing: '正在同步…', ok: '进度已存到云端', offline: '暂时连不上网络，进度先存在本机，连上后会自动同步' };
 
   function close() { if (el) { el.remove(); el = null; } }
 
@@ -55,14 +55,14 @@
     } } }, name, pw, pw2 || '', err, go);
     card.append(h('h2', {}, reg ? '注册账号' : '登录账号'), tabs, form,
       h('p', { class: 'note' }, reg
-        ? '用户名 3–16 位（英文字母、数字、下划线）。⚠️ 忘记密码没办法找回，请记好。这台设备上的游客进度会一起存进新账号。'
+        ? '用户名 3–16 位（英文字母、数字、下划线）。忘记密码没办法找回，请记好。这台设备上的游客进度会一起存进新账号。'
         : '登录后，这台设备上的游客进度会并入你的账号。'),
       h('button', { class: 'link', on: { click: close } }, '先不登录，继续当游客'));
     setTimeout(() => name.focus(), 50);
   }
 
   function renderMe(card, askDelete) {
-    card.append(h('h2', {}, `👤 ${S.user.name}`));
+    card.append(h('h2', {}, `账号：${S.user.name}`));
     const st = h('p', { class: 'status' }, STATUS[S.status] || '');
     card.append(st);
     const off = S.onChange(() => { if (!el || !st.isConnected) return off(); if (!S.user) { off(); render(''); } else st.textContent = STATUS[S.status] || ''; });
