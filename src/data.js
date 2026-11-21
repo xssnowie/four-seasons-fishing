@@ -12,7 +12,7 @@
     rare:    { cn: '稀有',     prob: 30,  safe: 0.30, strength: 0.40, reelTime: 4.5, weight: [1, 18],      color: 0x3d8bfd, folder: 'rare' },
     exotic:  { cn: '奇珍异兽', prob: 5, safe: 0.20, strength: 0.60, reelTime: 6.0, weight: [10, 90],     color: 0xa04dff, folder: 'exotic' },
     monster: { cn: '怪兽',     prob: 1, safe: 0.19, strength: 0.70, reelTime: 7.0, weight: [500, 6000],  color: 0xe8453c, folder: 'monster' },
-    fairy:   { cn: '小隐藏',   prob: 0.01, safe: 0.20, strength: 0.55, reelTime: 5.0, weight: [38, 46],     color: 0xff8fc8, folder: 'fairy' },
+    fairy:   { cn: '小隐藏',   prob: 0.01, safe: 0.18, strength: 0.55, reelTime: 5.0, weight: [38, 46],     color: 0xff8fc8, folder: 'fairy' },
     goddess: { cn: '大隐藏',   prob: 0.001, safe: 0.15, strength: 0.65, reelTime: 6.0, weight: [48, 52],     color: 0x1fa8d8, folder: 'fairy' },
   };
   const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy', 'goddess'];
