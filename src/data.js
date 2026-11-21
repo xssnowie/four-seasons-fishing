@@ -79,10 +79,10 @@
   add('monster', 'deepabyss', '深海巨兆', 'sea', 'winter', 'rainy', '背负珊瑚礁的深海巨兽，灯笼一亮，海面就要变天。');
 
   // ---- 小隐藏 · 四季小仙女（4）：各在自己的季节出现，天气水域不限 ----
-  add('fairy', 'fairy_spring', '春 · 小仙女', null, 'spring', null, '桃花开的时候，她会在水边折一枝花。', 'spring');
-  add('fairy', 'fairy_summer', '夏 · 小仙女', null, 'summer', null, '戴着荷花冠，最爱在荷叶上打盹。', 'summer');
-  add('fairy', 'fairy_autumn', '秋 · 小仙女', null, 'autumn', null, '发间别着桂花，走过的地方都是香的。', 'autumn');
-  add('fairy', 'fairy_winter', '冬 · 小仙女', null, 'winter', null, '一身雪白，鬓边一支红梅。', 'winter');
+  add('fairy', 'fairy_spring', '春 · 小仙女', null, 'spring', null, '粉发上戴着桃花花环，绿叶裙摆一摇，水面就漂满花瓣。', 'spring');
+  add('fairy', 'fairy_summer', '夏 · 小仙女', null, 'summer', null, '顶着向日葵花冠，像个小太阳，走到哪里都暖洋洋的。', 'summer');
+  add('fairy', 'fairy_autumn', '秋 · 小仙女', null, 'autumn', null, '枫叶编成的发冠，裙摆层层叠叠，一转身就落下满地红叶。', 'autumn');
+  add('fairy', 'fairy_winter', '冬 · 小仙女', null, 'winter', null, '戴着雪花冠、披着毛绒披肩，轻轻呵一口气，水面就结出小冰花。', 'winter');
 
   // ---- 大隐藏 · 水之女神（1）：任何场景都可能出现 ----
   add('goddess', 'goddess', '水之女神', null, null, null, '掌管江河湖海的女神，千年才回应一次钓竿。', 'goddess');
