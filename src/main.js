@@ -897,7 +897,32 @@
       const per = cols * rows, pages = Math.ceil(list.length / per);
       page = Math.min(page, pages - 1);
       const gx = W / 2 - (cols * sx - (sx - cw)) / 2 + cw / 2;
-      const detail = TB(this, W / 2, b.bottom - 58, '点一张已解锁的卡片看详情', 30, '#7a5a3a', { align: 'center', wordWrap: { width: b.w - 100, useAdvancedWrap: true } }).setOrigin(0.5);
+      const shown = list.slice(page * per, page * per + per).length, usedRows = Math.max(1, Math.ceil(shown / cols));
+      const hintY = Math.min(b.bottom - 70, gridTop + usedRows * sy + 30); // 提示紧跟在卡片下面，不贴着面板底
+      const detail = TB(this, W / 2, hintY, '点一张卡片看详情', 30, '#7a5a3a').setOrigin(0.5);
+      // 详情弹窗：在面板正中间弹出（原来写在最底部一行，很难注意到）
+      const showDetail = (f, got) => {
+        if (this.bookPop && this.bookPop.scene) this.bookPop.destroy();
+        const R = D.RARITY[f.rarity], cy0 = b.top + b.h / 2, pw = Math.min(b.w - 60, P ? 920 : 1180), ph = P ? 640 : 440;
+        const pop = this.bookPop = this.add.container(0, 0); o.add(pop);
+        const shade = this.add.rectangle(W / 2, cy0, b.w, b.h, 0x3a2410, 0.35).setInteractive({ useHandCursor: true });
+        shade.on('pointerdown', () => { A.play('click'); pop.destroy(); });
+        const g = this.add.graphics();
+        g.fillStyle(0xfffaf0, 1).fillRoundedRect(W / 2 - pw / 2, cy0 - ph / 2, pw, ph, 30);
+        g.lineStyle(8, R.color, 1).strokeRoundedRect(W / 2 - pw / 2, cy0 - ph / 2, pw, ph, 30);
+        pop.add([shade, g]);
+        const lines = [`出现：${f.rarity === 'goddess' ? '传说中会在任何地方出现' : condText(f)}`];
+        if (got) lines.push(`最大 ${fmtW(got.maxW)} · 钓到 ${got.count} 次`, f.desc); else lines.push('还没有钓到过');
+        let img, tx, ty0, tw;
+        if (P) { img = fit(this.add.image(W / 2, cy0 - ph / 2 + 150, 'fish_' + f.id), 300, 220); tx = W / 2 - pw / 2 + 50; ty0 = cy0 - ph / 2 + 290; tw = pw - 100; }
+        else { img = fit(this.add.image(W / 2 - pw / 2 + 210, cy0, 'fish_' + f.id), 340, 300); tx = W / 2 - pw / 2 + 420; ty0 = cy0 - ph / 2 + 50; tw = pw - 470; }
+        if (!got) img.setTintFill(0x3a3a4a);
+        pop.add(img);
+        pop.add(T(this, tx, ty0, got ? f.name : '???', 50, INK));
+        pop.add(TB(this, tx, ty0 + 70, R.cn, 30, HEX(R.color)));
+        pop.add(TB(this, tx, ty0 + 120, lines.join('\n'), 30, '#5a3a1a', { lineSpacing: 12, wordWrap: { width: tw, useAdvancedWrap: true } }));
+        pop.add(TB(this, W / 2, cy0 + ph / 2 - 34, '点任意处关闭', 24, '#9a7a5a').setOrigin(0.5));
+      };
       list.slice(page * per, page * per + per).forEach((f, i) => {
         const cx = gx + (i % cols) * sx, cy = gridTop + ch / 2 + Math.floor(i / cols) * sy;
         const got = this.save.book[f.id], R = D.RARITY[f.rarity];
@@ -909,16 +934,12 @@
         o.add(img);
         o.add(T(this, cx, cy + 75, got ? f.name : '???', 26, '#ffffff', { stroke: got ? '#4a2f17' : '#7a7a86', strokeThickness: 6 }).setOrigin(0.5));
         const hit = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true });
-        hit.on('pointerdown', () => {
-          A.play('click');
-          if (!got) detail.setText(f.rarity === 'goddess' ? '??? —— 传说中会在任何地方出现' : `??? · 出现：${condText(f)}`);
-          else detail.setText(`${f.name}（${R.cn}）· 出现：${condText(f)}\n最大 ${fmtW(got.maxW)} · 钓到 ${got.count} 次 · ${f.desc}`);
-        });
+        hit.on('pointerdown', () => { A.play('click'); showDetail(f, got); });
         o.add(hit);
       });
       o.add(detail);
       if (pages > 1) {
-        const px = P ? W / 2 : b.right - 200, py = P ? b.bottom - 150 : ty;
+        const px = P ? W / 2 : b.right - 200, py = P ? b.bottom - 110 : ty;
         o.add(TB(this, px, py, `${page + 1} / ${pages}`, 30, INK).setOrigin(0.5));
         if (page > 0) o.add(button(this, px - 110, py, 90, 70, '‹', () => this.openBook(tab, page - 1), { size: 44 }));
         if (page < pages - 1) o.add(button(this, px + 110, py, 90, 70, '›', () => this.openBook(tab, page + 1), { size: 44 }));
