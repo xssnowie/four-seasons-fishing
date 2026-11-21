@@ -18,8 +18,83 @@
   const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy', 'goddess'];
 
   const FISH = [];
+  // 每种鱼自己的介绍（照着素材图写的）；没有的才用调用处传入的那句
+  const DESC = {
+    "sea_seabass": "银灰色的身体，背鳍像一排小尖刺，码头边最常见的老朋友。",
+    "sea_clownfish": "橙白相间的条纹，最爱躲在海葵里，偶尔也会好奇地咬钩。",
+    "sea_grouper": "一身棕色斑点，喜欢窝在礁石缝里，嘴巴大得能吞下小鱼。",
+    "sea_saury": "细长得像一把银色小刀，成群在海面附近游。",
+    "sea_tuna": "深蓝背脊、黄色小鳍，游起来像一枚鱼雷，力气很大。",
+    "sea_mackerel": "背上有蓝黑色的波浪花纹，游得飞快。",
+    "sea_sardine": "小小一条，总是一大群一起行动，闪成一片银光。",
+    "sea_flounder": "身子扁扁的，两只眼睛长在同一边，平时贴着沙底装成石头。",
+    "sea_croaker": "金黄色的身体，会发出咕咕的叫声。",
+    "sea_hairtail": "像一条长长的银色缎带，牙齿可尖了，拿的时候要小心。",
+    "sea_pomfret": "圆圆扁扁的银色身体，像一面会游泳的小镜子。",
+    "sea_bluetang": "宝蓝色身体配上黄尾巴，是珊瑚礁里最亮眼的那一抹蓝。",
+    "sea_pufferfish": "一紧张就鼓成满身尖刺的小气球，别看它可爱，可碰不得。",
+    "sea_squid": "白白的身体、十条腿，遇到危险会喷出一团墨汁逃跑。",
+    "sea_octopus": "八条腿上都是小吸盘，聪明得会自己拧开瓶盖。",
+    "sea_crab": "举着两只大钳子横着走，脾气有点急。",
+    "sea_starfish": "五只角的橙色星星，在礁石上慢慢地爬。",
+    "sea_lobster": "长长的触须、一身红甲，是海里的大将军。",
+    "sea_seahorse": "用卷卷的尾巴勾住海草休息，站着游泳的小马。",
+    "sea_eel": "满身灰色斑点，喜欢从石洞里探出头，张嘴露出一排尖牙。",
+    "river_crucian": "圆圆胖胖的河边常客，谁都钓过它。",
+    "river_carp": "嘴边两根小胡须，金铜色的鳞片一片一片排得整整齐齐。",
+    "river_grasscarp": "青绿色的长身体，最爱吃水边的嫩草。",
+    "river_silvercarp": "一身银白，受惊时会跳出水面。",
+    "river_bighead": "脑袋又大又圆，占了身体的三分之一，所以叫胖头鱼。",
+    "river_tilapia": "身上有灰紫色的横纹，鳍边带一点粉红，很能适应各种水域。",
+    "river_snakehead": "身上有蛇一样的花纹，凶猛得连青蛙都敢吃。",
+    "river_catfish": "四根长长的胡须，白天躲在河底，晚上才出来觅食。",
+    "river_ricefieldeel": "金黄色、滑溜溜的长身体，最爱在稻田的泥洞里钻来钻去。",
+    "river_loach": "带着小胡须的小不点，滑得抓都抓不住。",
+    "river_bream": "身体又高又扁，银光闪闪。",
+    "river_topmouth": "嘴巴往上翘，专门在水面偷袭小虫子。",
+    "river_mandarinfish": "身上带着黑色豹纹，背鳍有尖刺，是河里的小猎手。",
+    "river_yellowcatfish": "被钓上来会发出嘎嘎的叫声，鳍上的刺要小心。",
+    "river_minnow": "细细长长的小白鱼，成群在浅水里窜来窜去。",
+    "river_zacco": "身上泛着淡淡的彩虹光，喜欢清澈的溪水。",
+    "river_shrimp": "透明的小身体，两根长长的触须，一碰就往后弹。",
+    "river_crayfish": "红通通的小钳子挥来挥去，夏天的宵夜明星。",
+    "river_mussel": "壳一打开，里面藏着一颗圆圆的珍珠。",
+    "river_turtle": "脸颊上两道红纹，趴在石头上晒太阳能晒一整天。",
+    "spring_sea_sakurasnapper": "粉红色的身体上开着樱花，春天限定的海中花。",
+    "spring_sea_sakurashrimp": "粉嫩透亮，身上还印着小樱花。",
+    "spring_sea_flyingfish": "张开樱花纹的大胸鳍，能跃出海面滑翔好远。",
+    "spring_sea_anemonecrab": "把一整朵粉色海葵顶在背上，走到哪里都像戴着花帽。",
+    "spring_river_peachmandarin": "斑纹之间点缀着桃花，春水里最好看的鳜鱼。",
+    "spring_river_sakurasalmon": "银色身体上一排樱花，春天才会逆流游回来。",
+    "spring_river_peachjelly": "伞盖像一朵盛开的桃花，触须末端还挂着小花瓣。",
+    "spring_river_willowfish": "细长得像一片柳叶，总在垂柳下的水里游。",
+    "summer_sea_glowshrimp": "通体发着蓝光，夏夜的海里像一盏小灯。",
+    "summer_sea_mantaray": "张开像翅膀一样的大鳍在海里飞，背上满是星点。",
+    "summer_sea_sailfish": "背上竖着一面大帆，长嘴像一把剑，是海里的短跑冠军。",
+    "summer_sea_seaturtle": "背壳上开满夏天的扶桑花，慢悠悠地游过浅海。",
+    "summer_river_lotuskoi": "粉色的锦鲤，总爱躲在荷花和荷叶底下乘凉。",
+    "summer_river_fireflyfish": "尾巴会像萤火虫一样一闪一闪地发光。",
+    "summer_river_bettafish": "紫色的大尾鳍像裙摆一样飘，脾气却很倔强。",
+    "summer_river_rainbowtrout": "雨停之后，身上会浮现一道彩虹。",
+    "autumn_sea_mapleseabream": "红彤彤的鳞片上印着枫叶，秋天的海里最喜庆。",
+    "autumn_sea_autumnsalmon": "身上的条纹像晚霞，背上还沾着一片枫叶。",
+    "autumn_sea_kingcrab": "满身尖刺的大红甲壳，长腿一伸比人还宽。",
+    "autumn_sea_cod": "银灰色的大个子，下巴上有一根小胡须。",
+    "autumn_river_osmanthuscarp": "金黄色的身体上开满桂花，游过的地方都是香的。",
+    "autumn_river_maple_trout": "斑点之间点缀着红枫叶，秋天限定的鳟鱼。",
+    "autumn_river_hairycrab": "两只钳子上长着毛茸茸的绒毛，秋风一起就最肥美。",
+    "autumn_river_icefish": "通体透明的小银鱼，几乎能看见骨头。",
+    "winter_sea_icefish": "半透明的身体上有雪花纹，好像是冰做的。",
+    "winter_sea_arcticcod": "背上还挂着一层薄雪，从北方的冰海游过来。",
+    "winter_sea_snowcrab": "红色的壳上落了一层白雪，像撒了糖霜。",
+    "winter_sea_crystaljelly": "头顶一朵雪花，触须末端挂着小冰晶，摸起来凉凉的。",
+    "winter_river_sturgeon": "背上一排冰晶骨板，长长的吻部，是河里的老寿星。",
+    "winter_river_snowtrout": "圆滚滚的浅蓝身体上印着一朵大雪花。",
+    "winter_river_icicle_fish": "细长的银白身体闪着冰光，就像一根会游的冰凌。",
+    "winter_river_snowloach": "身上缀满小雪花，冬天也在冰下钻来钻去。"
+    };
   function add(rarity, id, name, water, season, weather, desc, file) {
-    FISH.push({ id, name, rarity, water, season: season || null, weather: weather || null, desc: desc || '', file: file || id });
+    FISH.push({ id, name, rarity, water, season: season || null, weather: weather || null, desc: DESC[id] || desc || '', file: file || id });
   }
 
   // ---- 普通 · 海（20）----
@@ -68,7 +143,7 @@
   add('exotic', 'river_lingzhiturtle', '灵芝龟', 'river', 'autumn', 'sunny', '壳上长着发光的灵芝，活了一千年。');
   add('exotic', 'river_hebocarp', '河伯鲤', 'river', 'autumn', 'rainy', '戴着小王冠的河神，脾气有点大。');
   add('exotic', 'river_craneFish', '仙鹤鱼', 'river', 'winter', 'sunny', '长着鹤翼的鱼，晴朗冬日会飞出冰洞。');
-  add('exotic', 'river_snowfox', '雪狐鱼', 'river', 'winter', 'rainy', '有一条蓬松狐狸尾巴，冬雨里最活跃。');
+  add('exotic', 'river_snowfox', '雪狐鱼', 'river', 'winter', 'rainy', '拖着好几条蓬松的狐狸尾巴，冬雨里最活跃。');
 
   // ---- 怪兽（6，仅海）----
   add('monster', 'thunderwhale', '雷霆巨鲸', 'sea', 'spring', 'rainy', '被风暴云包裹的巨鲸，一甩尾就是一道雷。');
