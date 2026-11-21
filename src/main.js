@@ -58,7 +58,17 @@
     player_wait: { hand: [352, 307], rod: [0.55, -0.62] },
     player_reel: { hand: [353, 252], rod: [0.62, -0.50] },
     player_celebrate: { hand: [387, 128], rod: [0.25, -0.80] },
+    player_male_idle: { hand: [346, 256], rod: [0.36, -0.77] },
+    player_male_cast: { hand: [371, 160], rod: [0.20, -0.83] },
+    player_male_wait: { hand: [348, 269], rod: [0.55, -0.62] },
+    player_male_reel: { hand: [352, 198], rod: [0.62, -0.50] },
+    player_male_celebrate: { hand: [358, 122], rod: [0.25, -0.80] },
   };
+  // 玩家选的角色（只存本机）：'female' | 'male'；没选过是 null
+  const CHAR_KEY = 'fishing.char';
+  function getChar() { try { const c = localStorage.getItem(CHAR_KEY); return c === 'male' || c === 'female' ? c : null; } catch (e) { return null; } }
+  function setChar(c) { try { localStorage.setItem(CHAR_KEY, c); } catch (e) { /* ignore */ } }
+  const pkey = pose => (getChar() === 'male' ? 'player_male_' : 'player_') + pose;
 
   // 竖屏背景里人物脚踩的位置（背景图宽、高的比例），按每张图的码头 / 岸边量的
   const PLAYER_SPOT = {
@@ -111,6 +121,7 @@
     const m = [];
     // 场景背景不在这里：一张约 2MP，16 张全载手机会爆内存 → 用到时才加载（ensureBg）
     ['idle', 'cast', 'wait', 'reel', 'celebrate', 'float', 'rod', 'rod_bent'].forEach(k => m.push(['player_' + k, `assets/player/${k}.png`]));
+    ['idle', 'cast', 'wait', 'reel', 'celebrate'].forEach(k => m.push(['player_male_' + k, `assets/player_male/${k}.png`]));
     D.FISH.forEach(f => m.push(['fish_' + f.id, `assets/fish/${D.RARITY[f.rarity].folder}/${f.file}.png`]));
     ['logo', 'title_bg', 'title_bg_portrait', 'btn_primary', 'btn_secondary', 'panel', 'topbar',
       'card_common', 'card_rare', 'card_exotic', 'card_monster', 'card_fairy', 'btn_sound_on', 'btn_sound_off'].forEach(k => m.push(['ui_' + k, `assets/ui/${k}.png`]));
@@ -281,7 +292,7 @@
         if (this.textures.exists(k)) return;
         missing.add(k);
         if (k === 'player_float') makeSimple(this, k, 'float');
-        else if (k.startsWith('player_')) makePlayer(this, k, k.slice(7));
+        else if (k.startsWith('player_')) makePlayer(this, k, k.replace(/^player_(male_)?/, ''));
         else if (k.startsWith('fish_')) {
           const f = D.FISH.find(x => 'fish_' + x.id === k);
           if (f.rarity === 'fairy') makeFairy(this, k, f.season); else if (f.rarity === 'goddess') makeGoddess(this, k); else makeFish(this, k, f);
@@ -376,11 +387,13 @@
       if (has(this, 'ui_logo')) fit(this.add.image(W / 2, ty, 'ui_logo'), P ? 960 : 900, 450);
       T(this, W / 2, ty, '四季钓场', P ? 170 : 150, '#ffffff', { stroke: '#4a2f17', strokeThickness: 14 }).setOrigin(0.5);
       TB(this, W / 2, ty + (P ? 170 : 150), `本周：${D.SEASON_CN[sc.season]}季 · 此刻：${D.WEATHER_CN[sc.weather]}天`, 42, '#ffffff', { stroke: '#4a2f17', strokeThickness: 6 }).setOrigin(0.5);
-      const go = () => { A.unlock(); this.scene.start('Game'); };
+      const start = () => { A.unlock(); this.scene.start('Game'); };
+      const go = () => { if (this.picker) return; if (getChar()) start(); else this.pickChar(start); }; // 第一次开始先选角色
       button(this, W / 2, P ? H * 0.55 : 680, P ? 600 : 460, P ? 160 : 130, '开始钓鱼', go);
       const tip = TOUCH ? '按住屏幕蓄力 · 松手抛竿 · 浮标下沉时点一下 · 拉扯时让张力停在绿区' : '按住蓄力 · 松开抛竿 · 浮标下沉时点一下提竿 · 拉扯时让张力停在绿区';
       TB(this, W / 2, P ? H - 160 : H - 70, tip, 30, '#ffffff', { stroke: '#4a2f17', strokeThickness: 5, align: 'center', wordWrap: { width: W - 120, useAdvancedWrap: true } }).setOrigin(0.5);
-      this.input.keyboard && this.input.keyboard.once('keydown-SPACE', go);
+      this.input.keyboard && this.input.keyboard.on('keydown-SPACE', go);
+      if (getChar()) button(this, W - (P ? 130 : 140), P ? 90 : 70, P ? 220 : 220, P ? 90 : 80, '换角色', () => { if (!this.picker) this.pickChar(); }, { secondary: true, size: 32 });
       // 账号入口（没配置 Firebase 时不显示）
       if (window.Store.enabled) {
         const ab = button(this, W / 2, P ? H * 0.55 + 200 : 830, P ? 520 : 420, P ? 110 : 90, acctLabel(), () => window.AccountUI.open(), { secondary: true, size: P ? 38 : 34 });
@@ -389,6 +402,30 @@
       }
     }
   }
+  // 选角色弹层（标题页用）：两张卡片，点一张就记下来；onDone 有传就接着开始游戏
+  Title.prototype.pickChar = function (onDone) {
+    const Lx = layout(this.scale.width, this.scale.height), { W, H, P } = Lx, cur = getChar();
+    const o = this.picker = this.add.container(0, 0).setDepth(500);
+    const close = () => { o.destroy(); this.picker = null; };
+    o.add(this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.55).setInteractive().on('pointerdown', () => { if (!onDone) close(); }));
+    const pw = P ? 960 : 1100, ph = P ? 900 : 760, cy = H / 2;
+    o.add(panel(this, W / 2, cy, pw, ph, 'ui_panel'));
+    o.add(T(this, W / 2, cy - ph / 2 + 110, '选择你的钓手', 56, INK).setOrigin(0.5));
+    o.add(TB(this, W / 2, cy - ph / 2 + 175, '之后可以在标题页右上角「换角色」', 28, '#7a5a3a').setOrigin(0.5));
+    [['female', '女生', -1], ['male', '男生', 1]].forEach(([c, label, side]) => {
+      const cx = W / 2 + side * (P ? 220 : 250), cardY = cy + (P ? 60 : 50), cw = P ? 380 : 420, chh = P ? 520 : 440;
+      const g = this.add.graphics();
+      const draw = hl => { g.clear(); g.fillStyle(0xffffff, 1).fillRoundedRect(cx - cw / 2, cardY - chh / 2, cw, chh, 30); g.lineStyle(hl ? 10 : 6, hl ? 0xe8a93a : 0xd9c29a, 1).strokeRoundedRect(cx - cw / 2, cardY - chh / 2, cw, chh, 30); };
+      draw(c === cur);
+      const img = fit(this.add.image(cx, cardY - 30, (c === 'male' ? 'player_male_' : 'player_') + 'idle'), cw - 60, chh - 130);
+      const name = T(this, cx, cardY + chh / 2 - 55, label, 46, INK).setOrigin(0.5);
+      const hit = this.add.zone(cx, cardY, cw, chh).setInteractive({ useHandCursor: true });
+      hit.on('pointerover', () => draw(true)); hit.on('pointerout', () => draw(c === getChar()));
+      hit.on('pointerdown', () => { A.unlock(); A.play('click'); setChar(c); close(); if (onDone) onDone(); else this.scene.restart(); });
+      o.add([g, img, name, hit]);
+    });
+    if (!onDone) o.add(button(this, W / 2 + pw / 2 - 80, cy - ph / 2 + 80, 80, 80, '✕', close, { secondary: true, size: 34 }));
+  };
   function acctLabel() { const S = window.Store; return !S.ready ? '账号' : S.user ? `账号：${S.user.name}` : '登录 / 注册 · 存进度'; }
 
   // ---------------- 钓鱼主场景 ----------------
@@ -417,7 +454,7 @@
       this.lineG = this.add.graphics().setDepth(20);
       this.rodG = this.add.graphics().setDepth(22); // 鱼竿在人物前面，才像握在手里（没有鱼竿素材时用它画）
       this.rodImg = has(this, 'player_rod') ? this.add.image(0, 0, 'player_rod').setDepth(22) : null;
-      this.player = this.add.image(Lx.player.x, Lx.player.y, 'player_idle').setOrigin(0.5, 1).setDisplaySize(Lx.player.size, Lx.player.size).setDepth(21);
+      this.player = this.add.image(Lx.player.x, Lx.player.y, pkey('idle')).setOrigin(0.5, 1).setDisplaySize(Lx.player.size, Lx.player.size).setDepth(21);
       this.float = this.add.image(Lx.rodTip.x, Lx.rodTip.y, 'player_float').setDisplaySize(56, 56).setDepth(19).setVisible(false);
       this.bang = T(this, 0, 0, '！', 96, '#ff3b30', { stroke: '#ffffff', strokeThickness: 10 }).setOrigin(0.5).setDepth(40).setVisible(false);
       this.barG = this.add.graphics().setDepth(30);
@@ -579,7 +616,7 @@
     // ---------- 状态机 ----------
     setIdle() {
       this.state = 'idle';
-      this.player.setTexture('player_idle');
+      this.player.setTexture(pkey('idle'));
       this.float.setVisible(false); this.bang.setVisible(false);
       this.hint.setText(TOUCH ? '按住屏幕蓄力，松手抛竿' : '按住鼠标或空格蓄力，松开抛竿');
       this.barG.clear(); this.barText.removeAll(true); this.chargeLabel = false;
@@ -587,7 +624,7 @@
 
     press() {
       A.unlock();
-      if (this.state === 'idle') { this.state = 'charging'; this.charge = 0; this.chargeT = 0; this.player.setTexture('player_cast'); this.hint.setText('松手抛竿 —— 力度越大抛得越远，远处稀有鱼更多'); }
+      if (this.state === 'idle') { this.state = 'charging'; this.charge = 0; this.chargeT = 0; this.player.setTexture(pkey('cast')); this.hint.setText('松手抛竿 —— 力度越大抛得越远，远处稀有鱼更多'); }
       else if (this.state === 'waiting') { this.time.removeEvent(this.biteTimer); this.flash('收得太早了，鱼还没咬钩'); this.endCast(); }
       else if (this.state === 'bite') { this.time.removeEvent(this.biteTimer); this.startReel(); }
       else if (this.state === 'reeling') this.holding = true;
@@ -604,7 +641,7 @@
       const d = this.charge, tip = this.rodGeom().tip;
       this.hook = this.rollFish(d);
       const tgt = this.floatHome = this.floatTarget(d);
-      this.player.setTexture('player_wait');
+      this.player.setTexture(pkey('wait'));
       this.float.setVisible(true).setPosition(tip.x, tip.y);
       A.play('cast');
       this.tweens.addCounter({
@@ -648,7 +685,7 @@
     startReel() {
       this.state = 'reeling';
       this.bang.setVisible(false);
-      this.player.setTexture('player_reel');
+      this.player.setTexture(pkey('reel'));
       const R = D.RARITY[this.hook.fish.rarity];
       this.reel = { tension: 0.5, progress: 0, lo: 0.55 - R.safe / 2, hi: 0.55 + R.safe / 2, strength: R.strength, reelTime: R.reelTime, phase: Math.random() * 10, jerk: 1.2, grace: 0.6, tick: 0 };
       this.holding = true;
@@ -773,7 +810,7 @@
       this.state = 'landing';
       this.barG.clear(); this.barText.removeAll(true);
       this.float.setVisible(false);
-      this.player.setTexture('player_celebrate');
+      this.player.setTexture(pkey('celebrate'));
       const { fish, weight } = this.hook;
       const res = L.recordCatch(this.save, fish, weight, this.sc, Date.now());
       window.Store.commit();
