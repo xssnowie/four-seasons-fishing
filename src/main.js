@@ -636,8 +636,10 @@
       const inZone = r.tension >= r.lo && r.tension <= r.hi;
       r.progress = Math.max(0, r.progress + (inZone ? dt / r.reelTime : -0.12 * dt));
       r.grace -= dt;
-      const tx = this.floatHome.x + (tip.x + 200 - this.floatHome.x) * r.progress;
-      const ty = this.floatHome.y + (tip.y + 260 - this.floatHome.y) * r.progress * (this.Lx.P ? 1 : 0);
+      // 收线时浮标往近处的水面拉（近投落点，所有背景里都确认是水），不往竿尖拉，否则会被拖到码头 / 岸上
+      const end = this.winterRiver() ? this.floatHome : this.Lx.far(0);
+      const tx = this.floatHome.x + (end.x - this.floatHome.x) * r.progress;
+      const ty = this.floatHome.y + (end.y - this.floatHome.y) * r.progress;
       this.float.x += (tx - this.float.x) * Math.min(1, dt * 3);
       this.float.y = ty + 12 + Math.sin(time / 60) * 5 * r.strength;
       this.drawReelBars(inZone);
@@ -896,21 +898,45 @@
         o.add(T(this, cx, cy + 4, v, P ? 50 : 60, INK).setOrigin(0.5));
         o.add(T(this, cx, cy + 62, s, 26, '#9a7a5a').setOrigin(0.5));
       });
+      // 榜单区域：放进可滑动的容器（手指拖动 / 鼠标滚轮），超出面板的部分用遮罩裁掉
+      const top = cy + 120, bottom = b.bottom - (P ? 40 : 60), view = bottom - top; // 底部避开面板花边
+      const box = this.add.container(0, 0); o.add(box);
+      let contentH = 0;
       const listAt = (x, y, title, rows, empty, wdt) => {
-        o.add(T(this, x, y, title, 36, INK));
-        if (!rows.length) o.add(T(this, x, y + 60, empty, 30, '#9a9a9a'));
+        box.add(T(this, x, y, title, 36, INK));
+        if (!rows.length) box.add(T(this, x, y + 60, empty, 30, '#9a9a9a'));
         rows.forEach((c, i) => {
           const ry = y + 60 + i * 46;
-          o.add(T(this, x, ry, `${i + 1}. ${byId[c.id].name}`, 30, i < 3 ? '#c0731c' : INK));
-          o.add(T(this, x + wdt, ry, fmtW(c.w), 30, INK).setOrigin(1, 0));
+          box.add(T(this, x, ry, `${i + 1}. ${byId[c.id].name}`, 30, i < 3 ? '#c0731c' : INK));
+          box.add(T(this, x + wdt, ry, fmtW(c.w), 30, INK).setOrigin(1, 0));
         });
+        contentH = Math.max(contentH, y - top + 60 + Math.max(1, rows.length) * 46 + 20);
       };
       if (P) {
-        listAt(b.left + 70, cy + 150, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', b.w - 140);
-        listAt(b.left + 70, cy + 150 + 80 + Math.max(1, st.top.length) * 46 + 40, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', b.w - 140);
+        listAt(b.left + 70, top + 30, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', b.w - 140);
+        listAt(b.left + 70, top + 30 + 80 + Math.max(1, st.top.length) * 46 + 40, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', b.w - 140);
       } else {
-        listAt(b.left + 80, cy + 150, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', 620);
-        listAt(this.Lx.W / 2 + 60, cy + 150, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', 620);
+        listAt(b.left + 80, top + 30, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', 620);
+        listAt(this.Lx.W / 2 + 60, top + 30, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', 620);
+      }
+      const maskG = this.make.graphics({ add: false }); maskG.fillStyle(0xffffff).fillRect(b.left, top, b.w, view);
+      box.setMask(maskG.createGeometryMask());
+      o.once('destroy', () => maskG.destroy());
+      const maxScroll = Math.max(0, contentH - view);
+      if (maxScroll > 0) {
+        const bar = this.add.graphics(); o.add(bar);
+        const setY = y => {
+          box.y = Phaser.Math.Clamp(y, -maxScroll, 0);
+          const h = Math.max(60, view * view / contentH), t = top + (view - h) * (-box.y / maxScroll);
+          bar.clear(); bar.fillStyle(0x9a6534, 0.25).fillRoundedRect(b.right - 22, top, 10, view, 5); bar.fillStyle(0x9a6534, 0.8).fillRoundedRect(b.right - 22, t, 10, h, 5);
+        };
+        setY(0);
+        const zone = this.add.zone(b.left + b.w / 2, top + view / 2, b.w, view).setInteractive(); o.add(zone);
+        let startY = 0, startBox = 0;
+        zone.on('pointerdown', p => { startY = p.y; startBox = box.y; });
+        zone.on('pointermove', p => { if (p.isDown) setY(startBox + (p.y - startY)); });
+        zone.on('wheel', (p, dx, dy) => setY(box.y - dy));
+        o.add(T(this, b.right - 40, top - 2, '上下滑动查看更多', 22, '#9a7a5a').setOrigin(1, 1));
       }
     }
   }
