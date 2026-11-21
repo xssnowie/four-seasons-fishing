@@ -66,8 +66,16 @@
   };
   // 玩家选的角色（只存本机）：'female' | 'male'；没选过是 null
   const CHAR_KEY = 'fishing.char';
-  function getChar() { try { const c = localStorage.getItem(CHAR_KEY); return c === 'male' || c === 'female' ? c : null; } catch (e) { return null; } }
-  function setChar(c) { try { localStorage.setItem(CHAR_KEY, c); } catch (e) { /* ignore */ } }
+  // 角色存在存档里（登录后跟账号同步）；本机另记一份，没登录 / 账号还没选过时用
+  const okChar = c => (c === 'male' || c === 'female' ? c : null);
+  function localChar() { try { return okChar(localStorage.getItem(CHAR_KEY)); } catch (e) { return null; } }
+  function getChar() { return okChar(window.Store.save.char) || localChar(); }
+  function setChar(c) {
+    try { localStorage.setItem(CHAR_KEY, c); } catch (e) { /* ignore */ }
+    window.Store.save.char = c; window.Store.save.charAt = Date.now(); window.Store.commit();
+  }
+  // 登录的账号还没选过角色，就把这台设备上选的带进账号
+  window.Store.onChange(S => { if (S.user && !okChar(S.save.char) && localChar()) setChar(localChar()); });
   const pkey = pose => (getChar() === 'male' ? 'player_male_' : 'player_') + pose;
 
   // 竖屏背景里人物脚踩的位置（背景图宽、高的比例），按每张图的码头 / 岸边量的
@@ -480,6 +488,8 @@
       this.tickClock();
       let uid = window.Store.user && window.Store.user.uid;
       const offStore = window.Store.onChange(S => { // 登录 / 退出后，开着的榜单刷新一下
+        const want = pkey(this.player.texture.key.replace(/^player_(male_)?/, '')); // 账号同步下来的角色可能不一样
+        if (this.player.texture.key !== want && has(this, want)) this.player.setTexture(want);
         const u = S.user && S.user.uid; if (u === uid) return; uid = u;
         if (this.overlay && this.overlayKind === 'rank') this.openRank();
       });

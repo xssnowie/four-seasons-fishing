@@ -71,7 +71,7 @@
   // ---------- 存档（只存本机）----------
   const KEY = 'fishing.save.v1';
   function emptySave() {
-    return { book: {}, ach: {}, total: 0, rainCatches: 0, seasons: {}, catches: [] };
+    return { book: {}, ach: {}, total: 0, rainCatches: 0, seasons: {}, catches: [], char: null, charAt: 0 }; // char：选的角色，charAt：选的时间（合并时取较新的）
   }
   function load(storage, key) {
     try { const s = JSON.parse(storage.getItem(key || KEY)); if (s && s.book) return Object.assign(emptySave(), s); } catch (e) { /* 无存档或被禁用 */ }
@@ -99,6 +99,7 @@
     const seen = new Set();
     out.catches = [...a.catches, ...b.catches].filter(c => { const k = c.id + '|' + c.w + '|' + c.t; if (seen.has(k)) return false; seen.add(k); return true; })
       .sort((p, q) => q.w - p.w).slice(0, 200);
+    const pick = (a.charAt || 0) >= (b.charAt || 0) ? a : b; out.char = pick.char || a.char || b.char || null; out.charAt = Math.max(a.charAt || 0, b.charAt || 0);
     checkAchievements(out, Date.now()); // 合并后可能凑齐新成就（例如两边各有一半图鉴）
     return out;
   }
