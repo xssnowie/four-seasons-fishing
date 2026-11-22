@@ -123,11 +123,14 @@
         [86, 1], [88, 1], [90, 1], [86, 1], [81, 1], [78, 1], [81, 2], [79, 1], [83, 1], [86, 1], [91, 1], [90, 2], [88, 2],
         [88, 1], [90, 1], [88, 1], [85, 1], [81, 1], [83, 1], [85, 2], [86, 2], [81, 1], [78, 1], [86, 2], [null, 2]],
     },
-    xmas: { // 圣诞场：G 大调原创小曲，八音盒 + 反拍和弦 + 雪橇铃
-      bpm: 108, lead: 'musicbox', comp: 'offbeat', perc: 'sleigh', soft: true, lp: 6000, wet: 0.22,
-      chords: [[[55, 'M']], [[60, 'M']], [[62, 'M']], [[55, 'M']], [[52, 'm']], [[60, 'M']], [[62, 'M']], [[55, 'M']]],
-      melody: [[79, 2], [83, 2], [86, 3], [83, 1], [84, 2], [81, 2], [76, 4], [78, 2], [81, 2], [86, 2], [84, 2], [83, 6], [null, 2],
-        [76, 2], [79, 2], [83, 3], [81, 1], [79, 2], [76, 2], [72, 4], [74, 2], [78, 2], [81, 1], [79, 1], [78, 2], [79, 6], [null, 2]],
+    xmas: { // 圣诞场：《Jingle Bells》副歌（1857，公有领域），G 大调 16 小节；钟琴 + 嘭恰低音 + 雪橇铃 + 拍手，旋律每遍都在
+      bpm: 120, lead: 'glock', comp: 'offbeat', perc: 'sleigh', bounceBass: true, soft: true, lp: 7500, wet: 0.14, alwaysLead: true,
+      chords: [[[55, 'M']], [[55, 'M']], [[55, 'M']], [[55, 'M']], [[60, 'M']], [[55, 'M']], [[57, 'M']], [[62, 'M']],
+        [[55, 'M']], [[55, 'M']], [[55, 'M']], [[55, 'M']], [[60, 'M']], [[55, 'M']], [[62, 'M']], [[55, 'M']]],
+      melody: [[83, 2], [83, 2], [83, 4], [83, 2], [83, 2], [83, 4], [83, 2], [86, 2], [79, 3], [81, 1], [83, 8],
+        [84, 2], [84, 2], [84, 3], [84, 1], [84, 2], [83, 2], [83, 2], [83, 1], [83, 1], [83, 2], [81, 2], [81, 2], [83, 2], [81, 4], [86, 4],
+        [83, 2], [83, 2], [83, 4], [83, 2], [83, 2], [83, 4], [83, 2], [86, 2], [79, 3], [81, 1], [83, 8],
+        [84, 2], [84, 2], [84, 3], [84, 1], [84, 2], [83, 2], [83, 2], [83, 1], [83, 1], [86, 2], [86, 2], [84, 2], [81, 2], [79, 8]],
     },
   };
   const mf = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -147,7 +150,7 @@
 
   // 把歌展开成「第几个八分音符 → 要播的音」
   function compile(song) {
-    const ev = Array.from({ length: 64 }, () => []);
+    const ev = Array.from({ length: song.chords.length * 8 }, () => []); // 曲长 = 小节数 × 8 个八分音符
     let t = 0;
     song.melody.forEach(([m, len]) => { if (m != null) ev[t].push({ part: 'lead', m, len }); t += len; });
     song.chords.forEach((bar, b) => bar.forEach(([root, q], half) => {
@@ -181,7 +184,7 @@
     let step = 0, loop = 0, next = ctx.currentTime + 0.15;
     const timer = setInterval(() => {
       while (next < ctx.currentTime + 0.3) {
-        const at = next - ctx.currentTime + (song.swing && step % 2 ? song.swing * eighth : 0), restLoop = loop % 3 === 2; // 每 3 遍有 1 遍只留伴奏；swing = 后半拍稍拖
+        const at = next - ctx.currentTime + (song.swing && step % 2 ? song.swing * eighth : 0), restLoop = !song.alwaysLead && loop % 3 === 2; // 每 3 遍有 1 遍只留伴奏；swing = 后半拍稍拖
         ev[step].forEach(e => {
           if (e.part === 'lead' && !restLoop) instrument(song.lead, e.m, e.len * eighth * 0.95, at, song.lead === 'musicbox' ? 0.22 : 0.2);
           else if (e.part === 'bass' && !song.bounceBass) tone(mf(e.m), Math.min(e.len * eighth, 1.6), { type: 'sine', vol: song.soft ? 0.16 : 0.3, at, bus: mbus, attack: song.soft ? 0.12 : 0.02 });
@@ -197,7 +200,7 @@
         if (song.perc === 'shaker' || (song.perc === 'offbeat' && step % 2 === 1)) hissMusic(at, step % 2 ? 0.05 : 0.03);
         if (song.perc === 'sleigh') { hissMusic(at, step % 2 ? 0.045 : 0.07, 8500, 0.09); if (step % 4 === 2) clap(at); }
         step++; next += eighth;
-        if (step === 64) { step = 0; loop++; }
+        if (step === ev.length) { step = 0; loop++; }
       }
     }, 100);
     music = { timer };
