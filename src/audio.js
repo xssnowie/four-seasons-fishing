@@ -123,8 +123,9 @@
         [86, 1], [88, 1], [90, 1], [86, 1], [81, 1], [78, 1], [81, 2], [79, 1], [83, 1], [86, 1], [91, 1], [90, 2], [88, 2],
         [88, 1], [90, 1], [88, 1], [85, 1], [81, 1], [83, 1], [85, 2], [86, 2], [81, 1], [78, 1], [86, 2], [null, 2]],
     },
-    xmas: { // 圣诞场：《Jingle Bells》副歌（1857，公有领域），G 大调 16 小节；钟琴 + 嘭恰低音 + 雪橇铃 + 拍手，旋律每遍都在
-      bpm: 120, lead: 'glock', comp: 'offbeat', perc: 'sleigh', bounceBass: true, soft: true, lp: 7500, wet: 0.14, alwaysLead: true,
+    // —— 圣诞场：三首公有领域颂歌轮流播放（startMusic('xmas') 会按 PLAYLISTS.xmas 依次播）——
+    xmas_jingle: { // 《Jingle Bells》副歌（1857），G 大调 16 小节：钟琴 + 嘭恰低音 + 雪橇铃
+      bpm: 120, lead: 'glock', comp: 'offbeat', perc: 'sleigh', bounceBass: true, soft: true, lp: 7500, wet: 0.14, alwaysLead: true, times: 2,
       chords: [[[55, 'M']], [[55, 'M']], [[55, 'M']], [[55, 'M']], [[60, 'M']], [[55, 'M']], [[57, 'M']], [[62, 'M']],
         [[55, 'M']], [[55, 'M']], [[55, 'M']], [[55, 'M']], [[60, 'M']], [[55, 'M']], [[62, 'M']], [[55, 'M']]],
       melody: [[83, 2], [83, 2], [83, 4], [83, 2], [83, 2], [83, 4], [83, 2], [86, 2], [79, 3], [81, 1], [83, 8],
@@ -132,7 +133,23 @@
         [83, 2], [83, 2], [83, 4], [83, 2], [83, 2], [83, 4], [83, 2], [86, 2], [79, 3], [81, 1], [83, 8],
         [84, 2], [84, 2], [84, 3], [84, 1], [84, 2], [83, 2], [83, 2], [83, 1], [83, 1], [86, 2], [86, 2], [84, 2], [81, 2], [79, 8]],
     },
+    xmas_deck: { // 《Deck the Halls》（威尔士传统曲），G 大调 16 小节：八音盒 + 合唱垫音 + 雪橇铃
+      bpm: 112, lead: 'musicbox', comp: 'pad', perc: 'sleigh', soft: true, lp: 6500, wet: 0.24, alwaysLead: true, times: 2,
+      chords: [[[55, 'M']], [[55, 'M']], [[60, 'M']], [[62, 'M'], [55, 'M']], [[55, 'M']], [[55, 'M']], [[60, 'M']], [[62, 'M'], [55, 'M']],
+        [[62, 'M']], [[55, 'M']], [[57, 'M']], [[62, 'M']], [[55, 'M']], [[55, 'M']], [[60, 'M']], [[62, 'M'], [55, 'M']]],
+      melody: [[86, 3], [84, 1], [83, 2], [81, 2], [79, 2], [81, 2], [83, 2], [79, 2], [81, 1], [83, 1], [84, 1], [81, 1], [83, 3], [81, 1], [79, 2], [78, 2], [79, 4],
+        [86, 3], [84, 1], [83, 2], [81, 2], [79, 2], [81, 2], [83, 2], [79, 2], [81, 1], [83, 1], [84, 1], [81, 1], [83, 3], [81, 1], [79, 2], [78, 2], [79, 4],
+        [81, 3], [83, 1], [84, 2], [81, 2], [83, 3], [84, 1], [86, 2], [81, 2], [83, 1], [85, 1], [86, 2], [88, 1], [90, 1], [91, 2], [90, 2], [88, 2], [86, 4],
+        [86, 3], [84, 1], [83, 2], [81, 2], [79, 2], [81, 2], [83, 2], [79, 2], [81, 1], [83, 1], [84, 1], [81, 1], [83, 3], [81, 1], [79, 2], [78, 2], [79, 4]],
+    },
+    xmas_wish: { // 《We Wish You a Merry Christmas》（英国传统曲），G 大调 3/4 拍：钟声旋律 + 华尔兹伴奏
+      bpm: 132, bar: 6, lead: 'bell', comp: 'waltz', perc: 'sleigh', soft: true, lp: 7000, wet: 0.2, alwaysLead: true, times: 3,
+      chords: [[[62, 'M']], [[55, 'M']], [[60, 'M']], [[57, 'M']], [[62, 'M']], [[59, 'M']], [[52, 'm']], [[60, 'M'], [62, 'M']], [[55, 'M']]],
+      melody: [[null, 4], [74, 2], [79, 2], [79, 1], [81, 1], [79, 1], [78, 1], [76, 2], [76, 2], [76, 2], [81, 2], [81, 1], [83, 1], [81, 1], [79, 1],
+        [78, 2], [74, 2], [74, 2], [83, 2], [83, 1], [84, 1], [83, 1], [81, 1], [79, 2], [76, 2], [74, 1], [74, 1], [76, 2], [81, 2], [78, 2], [79, 4], [null, 2]],
+    },
   };
+  const PLAYLISTS = { xmas: ['xmas_jingle', 'xmas_deck', 'xmas_wish'] };
   const mf = m => 440 * Math.pow(2, (m - 69) / 12);
   const triad = (root, q) => [root, root + (q === 'm' ? 3 : 4), root + 7];
 
@@ -144,17 +161,21 @@
     else if (kind === 'flute') { tone(f, dur, Object.assign({ type: 'triangle', vol: vol, attack: 0.04 }, o)); tone(f * 2, dur * 0.8, Object.assign({ type: 'sine', vol: vol * 0.15, attack: 0.05 }, o)); }
     else if (kind === 'marimba') { tone(f, Math.min(dur, 0.45), Object.assign({ type: 'sine', vol: vol, attack: 0.003 }, o)); tone(f * 4, 0.08, Object.assign({ type: 'sine', vol: vol * 0.25, attack: 0.002 }, o)); }
     else if (kind === 'pluck') { tone(f, Math.min(dur + 0.3, 1.1), Object.assign({ type: 'triangle', vol: vol, attack: 0.004 }, o)); tone(f * 2, 0.25, Object.assign({ type: 'sine', vol: vol * 0.2, attack: 0.003 }, o)); }
+    else if (kind === 'bell') { // 教堂钟：非整数倍泛音，余音长
+      tone(f, 2.4, Object.assign({ type: 'sine', vol: vol, attack: 0.002 }, o)); tone(f * 2.76, 1.2, Object.assign({ type: 'sine', vol: vol * 0.22, attack: 0.002 }, o));
+      tone(f * 5.4, 0.5, Object.assign({ type: 'sine', vol: vol * 0.08, attack: 0.002 }, o)); tone(f / 2, 2.6, Object.assign({ type: 'sine', vol: vol * 0.18, attack: 0.004 }, o));
+    }
     else if (kind === 'musicbox') { tone(f, 2.2, Object.assign({ type: 'sine', vol: vol, attack: 0.006 }, o)); tone(f * 2, 0.9, Object.assign({ type: 'sine', vol: vol * 0.07, attack: 0.006 }, o)); }
     else tone(f, dur, Object.assign({ type: 'sine', vol: vol, attack: 0.02 }, o));
   }
 
   // 把歌展开成「第几个八分音符 → 要播的音」
   function compile(song) {
-    const ev = Array.from({ length: song.chords.length * 8 }, () => []); // 曲长 = 小节数 × 8 个八分音符
+    const bar = song.bar || 8, ev = Array.from({ length: song.chords.length * bar }, () => []); // 曲长 = 小节数 × 每小节八分音符数（4/4 = 8，3/4 = 6）
     let t = 0;
     song.melody.forEach(([m, len]) => { if (m != null) ev[t].push({ part: 'lead', m, len }); t += len; });
     song.chords.forEach((bar, b) => bar.forEach(([root, q], half) => {
-      const span = 8 / bar.length, s0 = b * 8 + half * span, n = triad(root, q);
+      const span = (song.bar || 8) / bar.length, s0 = b * (song.bar || 8) + half * span, n = triad(root, q);
       ev[s0].push({ part: 'bass', m: root - 12, len: span });
       for (let k = 0; k < span; k++) ev[s0 + k].push({ part: 'comp', notes: n, k, span });
     }));
@@ -177,10 +198,14 @@
   function startMusic(season) {
     if (!ensure()) return;
     stopMusic();
-    const song = SONGS[season] || SONGS.spring, ev = compile(song);
-    mbus = song.soft ? getSoftBus() : musicBus;
-    if (song.soft) { softBus.frequency.setValueAtTime(song.lp || 2000, ctx.currentTime); softWet.gain.setValueAtTime(song.wet == null ? 0.22 : song.wet, ctx.currentTime); }
-    const eighth = 60 / song.bpm / 2;
+    const list = PLAYLISTS[season] || [season]; // 歌单：每首播 times 遍后换下一首，中间敲一声钟
+    let idx = 0, song, ev, eighth;
+    const load = () => {
+      song = SONGS[list[idx % list.length]] || SONGS.spring; ev = compile(song); eighth = 60 / song.bpm / 2;
+      mbus = song.soft ? getSoftBus() : musicBus;
+      if (song.soft) { softBus.frequency.setValueAtTime(song.lp || 2000, ctx.currentTime); softWet.gain.setValueAtTime(song.wet == null ? 0.22 : song.wet, ctx.currentTime); }
+    };
+    load();
     let step = 0, loop = 0, next = ctx.currentTime + 0.15;
     const timer = setInterval(() => {
       while (next < ctx.currentTime + 0.3) {
@@ -194,16 +219,23 @@
             if (song.comp === 'broken') { if (e.k % 2 === 0) { const seq = [a, c, b + 12, c]; tone(mf(seq[(e.k / 2) % 4] + 12), eighth * 3, { type: 'sine', vol: 0.035, at, bus: mbus, attack: 0.06 }); } }
             else if (song.comp === 'arp') { if (e.k % 2 === 0) { const seq = [a, c, a + 12, c]; instrument('warm', seq[(e.k / 2) % 4], eighth * 1.5, at, 0.035); } }
             else if (song.comp === 'offbeat') { if (e.k % 2 === 1) [a, b, c].forEach(m => tone(mf(m + 12), eighth * 0.6, { type: song.soft ? 'sine' : 'triangle', vol: song.soft ? 0.05 : 0.045, at, bus: mbus, attack: 0.005 })); }
+            else if (song.comp === 'waltz') { if (e.k % 6 === 0) tone(mf(a - 12), eighth * 1.8, { type: 'triangle', vol: 0.22, at, bus: mbus, attack: 0.004 }); else if (e.k % 2 === 0) [a, b, c].forEach(m => tone(mf(m + 12), eighth * 0.8, { type: 'sine', vol: 0.045, at, bus: mbus, attack: 0.005 })); }
             else if (song.comp === 'pad' && e.k === 0) [a, b, c].forEach(m => tone(mf(m + 12), e.span * eighth * 1.1, { type: 'sine', vol: 0.045, at, bus: mbus, attack: 0.8 }));
           }
         });
         if (song.perc === 'shaker' || (song.perc === 'offbeat' && step % 2 === 1)) hissMusic(at, step % 2 ? 0.05 : 0.03);
-        if (song.perc === 'sleigh') { hissMusic(at, step % 2 ? 0.045 : 0.07, 8500, 0.09); if (step % 4 === 2) clap(at); }
+        if (song.perc === 'sleigh') { hissMusic(at, step % 2 ? 0.045 : 0.07, 8500, 0.09); if (step % 4 === 2 && (song.bar || 8) === 8) clap(at); }
         step++; next += eighth;
-        if (step === ev.length) { step = 0; loop++; }
+        if (step === ev.length) {
+          step = 0; loop++;
+          if (list.length > 1 && loop >= (song.times || 1)) { // 换歌：先敲一声钟，留 1.5 秒
+            idx++; loop = 0; instrument('bell', 79, 1, next - ctx.currentTime, 0.18); instrument('bell', 67, 1, next - ctx.currentTime + 0.02, 0.12);
+            next += 1.5; load();
+          }
+        }
       }
     }, 100);
-    music = { timer };
+    music = { timer, name: () => list[idx % list.length] };
   }
   function clap(at) { // 轻拍手：带通噪声，两下叠成「啪」
     [0, 0.012].forEach(d => {
@@ -232,5 +264,6 @@
     play(name) { try { if (!muted && SFX[name]) SFX[name](); } catch (e) { /* 音频失败不影响游戏 */ } },
     setRain, startMusic, stopMusic, setMuted,
     isMuted: () => muted,
+    nowPlaying: () => (music ? music.name() : null),
   };
 })(window);
