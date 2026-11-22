@@ -1,5 +1,5 @@
 rules_version = '2';
-// 四季钓场：每个玩家只能读写自己的存档 saves/{uid}
+// 四季钓场：每个玩家只能读写自己的存档 saves/{uid}；排行榜 ranks/{uid} 谁都能看，只有本人能写自己那一行
 service cloud.firestore {
   match /databases/{database}/documents {
     match /saves/{uid} {
@@ -11,6 +11,29 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 16;
     }
+
+    // 排序键 K = 值 × 1e10 + (1e10 − 达成时间秒)，规则里核对 K 和值、时间对得上
+    function score(d, b, mx) {
+      return d[b] is int && d[b + 'T'] is int && d[b + 'K'] is int
+        && d[b] >= 0 && d[b] <= mx
+        && d[b + 'T'] > 0 && d[b + 'T'] < 10000000000
+        && d[b + 'K'] == d[b] * 10000000000 + 10000000000 - d[b + 'T'];
+    }
+    match /ranks/{uid} {
+      allow read: if true;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'pts', 'ptsT', 'ptsK', 'book', 'bookT', 'bookK', 'fish', 'fishT', 'fishK', 'fishId', 'mon', 'monT', 'monK', 'monId'])
+        && request.resource.data.name is string
+        && request.resource.data.name.lower() + '@players.four-seasons-fishing.app' == request.auth.token.email
+        && request.resource.data.fishId is string && request.resource.data.fishId.size() <= 40
+        && request.resource.data.monId is string && request.resource.data.monId.size() <= 40
+        && score(request.resource.data, 'pts', 5000)
+        && score(request.resource.data, 'book', 500)
+        && score(request.resource.data, 'fish', 50000)
+        && score(request.resource.data, 'mon', 800000);
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

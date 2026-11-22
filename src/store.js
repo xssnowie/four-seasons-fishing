@@ -1,6 +1,7 @@
 // 存档 + 账号（window.Store）。没配置 Firebase 时就是纯本机存档，和以前一样。
 // 账号：用户名 + 密码。Firebase 只认邮箱，所以把用户名换成一个内部邮箱（不会真的发邮件）。
 // 云端：Firestore saves/{uid} = { save: 存档 JSON 字符串, name, updatedAt }，安全规则只允许本人读写。
+// 排行榜：Firestore ranks/{uid} = { name, 4 个榜的值 / 时间 / 排序键 }（见 GameLogic.rankEntry），谁都能读，只有本人能写。
 (function () {
   const L = window.GameLogic;
   const GUEST = L.KEY;
@@ -71,6 +72,7 @@
         L.persist(ls, S.save, key());
         await fb.fs.setDoc(ref(), { save: JSON.stringify(S.save), name: S.user.name, updatedAt: Date.now() });
         S.status = 'ok';
+        await pushRank();
       } catch (e) {
         console.warn('[store] 同步失败，稍后再试', e && e.code);
         S.status = 'offline';
@@ -79,6 +81,38 @@
     })();
     await pushing;
   }
+
+  // 测试账号：不上排行榜（只存用户名的哈希，公开仓库里不写明文）。要加新的测试号，把用户名的哈希加进来
+  const nameHash = n => { let x = 2166136261; for (const c of String(n || '').toLowerCase()) { x ^= c.charCodeAt(0); x = Math.imul(x, 16777619) >>> 0; } return x.toString(36); };
+  const TEST_ACCOUNTS = new Set(['112ewnu']);
+  S.isTester = name => TEST_ACCOUNTS.has(nameHash(name === undefined ? S.user && S.user.name : name));
+
+  // 排行榜：成绩有变化才写（失败不影响存档同步，下次同步再试）；测试账号不写，以前写过的删掉
+  let lastRank = '';
+  const rankRef = () => fb.fs.doc(fb.db, 'ranks', S.user.uid);
+  async function pushRank() {
+    const row = Object.assign({ name: S.user.name }, L.rankEntry(S.save)), k = S.user.uid + JSON.stringify(row);
+    if (k === lastRank) return;
+    try { if (S.isTester()) await fb.fs.deleteDoc(rankRef()); else await fb.fs.setDoc(rankRef(), row); lastRank = k; } catch (e) { console.warn('[store] 排行榜上传失败', e && e.code); }
+  }
+  // 读某个榜的前 50 名：[{ uid, name, v, id }]（只列有成绩的）；结果缓存 1 分钟，免得来回切页签一直读
+  const topCache = {};
+  S.rankTop = async board => {
+    await need();
+    const c = topCache[board]; if (c && Date.now() - c.at < 60000) return c.rows;
+    const { fs, db } = fb;
+    const snap = await fs.getDocs(fs.query(fs.collection(db, 'ranks'), fs.orderBy(board + 'K', 'desc'), fs.limit(50)));
+    const rows = snap.docs.map(d => { const x = d.data(); return { uid: d.id, name: x.name, v: x[board], id: x[board + 'Id'] || '' }; }).filter(r => r.v > 0 && !S.isTester(r.name));
+    topCache[board] = { at: Date.now(), rows };
+    return rows;
+  };
+  // 我的名次 = 排序键比我大的人数 + 1（用本机最新成绩算，不用等上传）
+  S.rankMine = async board => {
+    await need();
+    const { fs, db } = fb, K = L.rankEntry(S.save)[board + 'K'];
+    const snap = await fs.getCount(fs.query(fs.collection(db, 'ranks'), fs.where(board + 'K', '>', K)));
+    return snap.data().count + 1;
+  };
 
   // 每钓一条调用一次：先存本机，登录了就几秒后同步上云
   S.commit = () => {
@@ -129,6 +163,7 @@
     try {
       await fb.auth.reauthenticateWithCredential(user, fb.auth.EmailAuthProvider.credential(user.email, pw || ''));
       await fb.fs.deleteDoc(ref());
+      try { await fb.fs.deleteDoc(rankRef()); } catch (e) { /* 没上过榜就没有这一行 */ }
       const k = key();
       await fb.auth.deleteUser(user);
       ls.removeItem(k);

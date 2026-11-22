@@ -167,7 +167,29 @@
     return { points, maxPoints, found, totalFish: D.FISH.length, top: fishOnly.slice(0, 10), topMonsters: monsters.slice(0, 5) };
   }
 
-  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
+
+  // 全服排行榜的一行（Firestore ranks/{uid}）。4 个榜：pts 成就点数 · book 图鉴 · fish 最大一条（不含怪兽）· mon 最大怪兽
+  // 每个榜存 值 v、达成时间 T（秒）和排序键 K = v × 1e10 + (1e10 − T)：只按 K 一个字段排，同分时先达成的 K 更大、排前面
+  const RANK_E = 1e10;
+  const RANK_BOARDS = ['pts', 'book', 'fish', 'mon'];
+  function rankEntry(save) {
+    const sec = t => Math.max(1, Math.min(RANK_E - 1, Math.floor((t || 0) / 1000)));
+    const byId = Object.fromEntries(D.FISH.concat(D.EVENT_FISH).map(f => [f.id, f]));
+    const done = D.ACHIEVEMENTS.filter(a => save.ach[a.id]);
+    const got = D.FISH.filter(f => save.book[f.id]);
+    const fish = save.catches.find(c => byId[c.id] && byId[c.id].rarity !== 'monster');
+    const mon = save.catches.find(c => byId[c.id] && byId[c.id].rarity === 'monster');
+    const e = {
+      pts: done.reduce((n, a) => n + a.points, 0), ptsT: sec(Math.max(0, ...done.map(a => save.ach[a.id]))),
+      book: got.length, bookT: sec(Math.max(0, ...got.map(f => save.book[f.id].first))),
+      fish: fish ? Math.round(fish.w * 100) : 0, fishT: sec(fish && fish.t), fishId: fish ? fish.id : '',
+      mon: mon ? Math.round(mon.w * 100) : 0, monT: sec(mon && mon.t), monId: mon ? mon.id : '',
+    };
+    RANK_BOARDS.forEach(b => { e[b + 'K'] = e[b] * RANK_E + (RANK_E - e[b + 'T']); });
+    return e;
+  }
+
+  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, rankEntry, RANK_BOARDS, KEY, RAIN_CHANCE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GameLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

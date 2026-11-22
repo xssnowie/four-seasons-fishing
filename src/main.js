@@ -542,7 +542,7 @@
         const want = pkey(poseName(this.player.texture.key)); // 账号同步下来的角色可能不一样
         if (this.player.texture.key !== want && has(this, want)) this.player.setTexture(want);
         const u = S.user && S.user.uid; if (u === uid) return; uid = u;
-        if (this.overlay && this.overlayKind === 'rank') this.openRank();
+        if (this.overlay && this.overlayKind === 'rank') this.openRank(this.rankTab);
       });
       this.events.once('shutdown', offStore);
     }
@@ -1097,21 +1097,70 @@
       });
     }
 
-    // 成就榜（只存本机：显示自己的成绩）
-    openRank() {
+    // 成就榜：「我的」= 自己的成绩（本机）；其余 4 个页签 = 全服前 50 名（Firestore ranks），同分先达成的排前面
+    openRank(tab) {
       if (this.busy()) return;
-      const b = this.sheet(), o = b.o, P = this.Lx.P, SS = window.Store;
+      const SS = window.Store;
+      tab = this.rankTab = SS.enabled ? (tab || 'pts') : 'mine';
+      const b = this.sheet(), o = b.o, P = this.Lx.P, W = this.Lx.W;
       this.overlayKind = 'rank';
       const st = L.stats(this.save);
       const byId = Object.fromEntries(D.FISH.concat(D.EVENT_FISH).map(f => [f.id, f]));
-      o.add(T(this, b.left + 50, b.top + 30, '我的成就榜', 48, INK));
-      const where = SS.user ? `${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端' : '成绩只存在这台设备';
-      o.add(TB(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));
+      o.add(T(this, b.left + 50, b.top + 30, '成就榜', 48, INK));
       if (SS.enabled) o.add(button(this, b.right - 56 - 60 - (P ? 130 : 150), b.top + 56, P ? 260 : 300, 80, SS.user ? '账号' : '登录 / 注册', () => window.AccountUI.open(), { secondary: true, size: 30 }));
+      const TABS = [['pts', P ? '点数' : '成就点数'], ['book', '图鉴'], ['fish', P ? '大鱼' : '最大的鱼'], ['mon', '怪兽'], ['mine', '我的']]; // 竖屏按钮窄，用短名
+      let y0 = b.top + 100;
+      if (SS.enabled) {
+        const tstep = Math.min(P ? 192 : 250, (b.w - (P ? 60 : 420)) / TABS.length), tw = tstep - 10, ty = b.top + (P ? 128 : 112); // 横屏页签停在「账号」按钮左边
+        TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openRank(id), { secondary: id !== tab, size: 30 })));
+        y0 = ty + 50;
+      }
+      if (tab === 'mine') return this.rankMine(b, o, st, byId, y0);
+
+      // —— 全服榜 ——
+      const val = { pts: r => `${r.v} 点`, book: r => `${r.v} / ${D.FISH.length}`, fish: r => fmtW(r.v / 100), mon: r => fmtW(r.v / 100) }[tab];
+      const sub = r => (tab === 'fish' || tab === 'mon') && byId[r.id] ? byId[r.id].name : '';
+      const me = L.rankEntry(this.save), myV = me[tab];
+      const bar = { x: b.left + 40, y: y0 + 16, w: b.w - 80, h: 96 };
+      const g = this.add.graphics(); g.fillStyle(0xfff3c4, 1).fillRoundedRect(bar.x, bar.y, bar.w, bar.h, 22); g.lineStyle(4, 0xd9a740, 1).strokeRoundedRect(bar.x, bar.y, bar.w, bar.h, 22); o.add(g);
+      const myRank = TB(this, bar.x + 30, bar.y + bar.h / 2, '', 32, INK).setOrigin(0, 0.5); o.add(myRank);
+      const myVal = TB(this, bar.x + bar.w - 30, bar.y + bar.h / 2, myV > 0 ? val({ v: myV }) : '', 32, INK).setOrigin(1, 0.5); o.add(myVal);
+      const tip = { pts: '达成成就得点数', book: '已解锁鱼种（不含节日限定）', fish: '单条最重的鱼，不含怪兽', mon: '单条最重的怪兽' }[tab];
+      myRank.setText(!SS.user ? '登录后才能上榜' : SS.isTester() ? '测试账号：不参加排行榜' : myV > 0 ? '我的名次：查询中…' : `还没有成绩（${tip}）`);
+      const top = bar.y + bar.h + 24, bottom = b.bottom - (P ? 40 : 60);
+      o.add(TB(this, W / 2, top + 4, `全服前 50 名 · ${tip} · 同分时先达成的排前面`, 24, '#9a7a5a').setOrigin(0.5, 0));
+      const listTop = top + 44;
+      const status = TB(this, W / 2, listTop + 80, '正在读取排行榜…', 30, '#9a9a9a').setOrigin(0.5); o.add(status);
+      const alive = () => this.overlay === o; // 读完时面板可能已经关掉或换了页签
+      if (SS.user && myV > 0 && !SS.isTester()) SS.rankMine(tab).then(n => { if (alive()) myRank.setText(`我的名次：第 ${n} 名`); }).catch(() => { if (alive()) myRank.setText('我的名次：暂时查不到'); });
+      SS.rankTop(tab).then(rows => {
+        if (!alive()) return;
+        status.setVisible(!rows.length); status.setText('还没有人上榜，快去抢第一！');
+        const box = this.add.container(0, 0); o.add(box);
+        const rh = 72, x0 = b.left + 50, x1 = b.right - 50;
+        rows.forEach((r, i) => {
+          const ry = listTop + i * rh, mine = SS.user && r.uid === SS.user.uid;
+          if (mine || i % 2 === 0) { const rg = this.add.graphics(); rg.fillStyle(mine ? 0xffe08a : 0xffffff, mine ? 0.9 : 0.45).fillRoundedRect(x0 - 16, ry, x1 - x0 + 32, rh - 6, 16); box.add(rg); }
+          const cy = ry + (rh - 6) / 2, col = ['#d4a017', '#8a9aa8', '#b8733a'][i] || INK;
+          box.add(T(this, x0 + 30, cy, `${i + 1}`, i < 3 ? 40 : 32, col).setOrigin(0.5));
+          box.add(TB(this, x0 + 80, cy, r.name + (mine ? '（我）' : ''), 32, INK).setOrigin(0, 0.5));
+          const s = sub(r);
+          box.add(TB(this, x1, cy, val(r), 32, INK).setOrigin(1, 0.5));
+          if (s) box.add(TB(this, x1 - (P ? 190 : 230), cy, s, 24, '#9a7a5a').setOrigin(1, 0.5));
+        });
+        this.scrollable(o, b, listTop, bottom - listTop, box, rows.length * rh + 10);
+      }).catch(e => { console.warn('[rank]', e); if (alive()) status.setText('暂时连不上排行榜，稍后再试'); });
+    }
+
+    // 「我的」页签：自己的成绩（本机存档）
+    rankMine(b, o, st, byId, y0) {
+      const P = this.Lx.P, SS = window.Store;
+      const where = SS.user ? `${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端并上榜' : '成绩只存在这台设备';
+      o.add(TB(this, b.left + 50, y0 + 10, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 100, useAdvancedWrap: true } }));
       const best = st.top[0];
       const cards = [['成就点数', `${st.points}`, `/ ${st.maxPoints}`], ['图鉴完成度', `${Math.round(st.found / st.totalFish * 100)}%`, `${st.found} / ${st.totalFish}`],
         ['最大一条', best ? fmtW(best.w) : '—', best ? byId[best.id].name : '还没钓到']];
-      const cw = P ? 290 : 440, ch = 190, cgap = P ? 30 : 70, cy = b.top + 280;
+      const cw = P ? 290 : 440, ch = 190, cgap = P ? 30 : 70, cy = y0 + 195;
       const cx0 = this.Lx.W / 2 - (cw * 3 + cgap * 2) / 2 + cw / 2;
       cards.forEach(([t, v, s], i) => {
         const cx = cx0 + i * (cw + cgap);
@@ -1121,7 +1170,6 @@
         o.add(TB(this, cx, cy + 4, v, P ? 50 : 60, INK).setOrigin(0.5));
         o.add(TB(this, cx, cy + 62, s, 26, '#9a7a5a').setOrigin(0.5));
       });
-      // 榜单区域：放进可滑动的容器（手指拖动 / 鼠标滚轮），超出面板的部分用遮罩裁掉
       const top = cy + 120, bottom = b.bottom - (P ? 40 : 60), view = bottom - top; // 底部避开面板花边
       const box = this.add.container(0, 0); o.add(box);
       let contentH = 0;
@@ -1142,24 +1190,28 @@
         listAt(b.left + 80, top + 30, '最大的鱼 Top 10', st.top, '还没有记录，去钓一条吧', 620);
         listAt(this.Lx.W / 2 + 60, top + 30, '怪兽榜 Top 5', st.topMonsters, '还没有钓到怪兽', 620);
       }
+      this.scrollable(o, b, top, view, box, contentH);
+    }
+
+    // 可滑动的列表区域（手指拖动 / 鼠标滚轮），超出的部分用遮罩裁掉
+    scrollable(o, b, top, view, box, contentH) {
       const maskG = this.make.graphics({ add: false }); maskG.fillStyle(0xffffff).fillRect(b.left, top, b.w, view);
       box.setMask(maskG.createGeometryMask());
       o.once('destroy', () => maskG.destroy());
       const maxScroll = Math.max(0, contentH - view);
-      if (maxScroll > 0) {
-        const bar = this.add.graphics(); o.add(bar);
-        const setY = y => {
-          box.y = Phaser.Math.Clamp(y, -maxScroll, 0);
-          const h = Math.max(60, view * view / contentH), t = top + (view - h) * (-box.y / maxScroll);
-          bar.clear(); bar.fillStyle(0x9a6534, 0.25).fillRoundedRect(b.right - 22, top, 10, view, 5); bar.fillStyle(0x9a6534, 0.8).fillRoundedRect(b.right - 22, t, 10, h, 5);
-        };
-        setY(0);
-        const zone = this.add.zone(b.left + b.w / 2, top + view / 2, b.w, view).setInteractive(); o.add(zone);
-        let startY = 0, startBox = 0;
-        zone.on('pointerdown', p => { startY = p.y; startBox = box.y; });
-        zone.on('pointermove', p => { if (p.isDown) setY(startBox + (p.y - startY)); });
-        zone.on('wheel', (p, dx, dy) => setY(box.y - dy));
-      }
+      if (maxScroll <= 0) return;
+      const bar = this.add.graphics(); o.add(bar);
+      const setY = y => {
+        box.y = Phaser.Math.Clamp(y, -maxScroll, 0);
+        const h = Math.max(60, view * view / contentH), t = top + (view - h) * (-box.y / maxScroll);
+        bar.clear(); bar.fillStyle(0x9a6534, 0.25).fillRoundedRect(b.right - 22, top, 10, view, 5); bar.fillStyle(0x9a6534, 0.8).fillRoundedRect(b.right - 22, t, 10, h, 5);
+      };
+      setY(0);
+      const zone = this.add.zone(b.left + b.w / 2, top + view / 2, b.w, view).setInteractive(); o.add(zone);
+      let startY = 0, startBox = 0;
+      zone.on('pointerdown', p => { startY = p.y; startBox = box.y; });
+      zone.on('pointermove', p => { if (p.isDown) setY(startBox + (p.y - startY)); });
+      zone.on('wheel', (p, dx, dy) => setY(box.y - dy));
     }
   }
 
