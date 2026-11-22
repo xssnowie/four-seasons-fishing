@@ -121,6 +121,21 @@
     const s = Math.max(L0.W / iw, L0.H / ih);
     return { s, iw, ih, at: (fx, fy) => ({ x: fx * iw * s, y: L0.H - (1 - fy) * ih * s }) };
   }
+  // 每张背景的浮标水面：[近投 x, y, 远投 x, y]（背景图里的相对位置；看过网格图挑的，避开码头、桩子、石头、荷叶）
+  const LAND_L = {
+    spring_sea: [0.52, 0.72, 0.80, 0.50], spring_river: [0.55, 0.70, 0.80, 0.50],
+    summer_sea: [0.50, 0.72, 0.80, 0.50], summer_river: [0.48, 0.66, 0.72, 0.50],
+    autumn_sea: [0.52, 0.72, 0.80, 0.52], autumn_river: [0.52, 0.68, 0.78, 0.55],
+    winter_sea: [0.50, 0.66, 0.70, 0.47],
+    xmas: [0.56, 0.74, 0.86, 0.58],
+  };
+  const LAND_P = {
+    spring_sea: [0.62, 0.62, 0.78, 0.48], spring_river: [0.58, 0.62, 0.78, 0.47],
+    summer_sea: [0.58, 0.62, 0.75, 0.47], summer_river: [0.64, 0.65, 0.80, 0.50],
+    autumn_sea: [0.60, 0.65, 0.75, 0.50], autumn_river: [0.72, 0.64, 0.80, 0.48],
+    winter_sea: [0.62, 0.60, 0.75, 0.47],
+    xmas: [0.62, 0.68, 0.78, 0.50],
+  };
   const ICE = { landscape: [0.716, 0.722], portrait: [0.733, 0.671] }; // 冰洞在背景图里的相对位置（素材指令里写的同一位置）
 
   // 多字的说明、列表、提示用圆体（猫啃网糖圆体），标题和按钮保持站酷快乐体
@@ -395,32 +410,52 @@
     if (s === 'event') return `assets/event/${w}/${kind === 'bgp' ? 'bg_portrait' : 'bg'}.png`; // 节日场：bg_event_xmas / bgp_event_xmas
     return kind === 'bgp' ? `assets/bg/portrait/${s}_${w}.png` : `assets/bg/${s}_${w}.png`;
   }
+  // 图片加载：每张图用自己的 Image 加载，再放进 Phaser 的纹理表。
+  // 以前背景和节日素材共用 Phaser 的加载器，两批同时加载时「加载完成」会被另一批先触发，背景被误当成缺图画成占位，要刷新才好
+  const texP = {}, failed = new Set();
+  function loadTex(scene, key, url) {
+    const tm = scene.textures;
+    if (tm.exists(key) && !failed.has(key)) return Promise.resolve(true);
+    if (texP[key]) return texP[key];
+    return (texP[key] = new Promise(res => {
+      const img = new Image();
+      img.onload = () => { delete texP[key]; if (failed.delete(key) && tm.exists(key)) tm.remove(key); if (!tm.exists(key)) tm.addImage(key, img); res(true); };
+      img.onerror = () => { delete texP[key]; res(false); };
+      img.src = url;
+    }));
+  }
   // 节日场素材（可钓物 + 皮肤）进场才下载，不拖慢首次打开；缺图用占位
-  function ensureEvent(scene, ev, cb) {
+  function ensureEvent(scene, ev, cb, onSkin) { // cb：全部到齐；onSkin：圣诞装到了（先换装，不等鱼图）
     const list = D.EVENT_FISH.filter(f => f.event === ev).map(f => ['fish_' + f.id, `assets/event/${ev}/fish/${f.file}.png`]);
     ['female', 'male'].forEach(g => ['idle', 'cast', 'wait', 'reel', 'celebrate'].forEach(k => list.push([`player_${ev}_${g}_${k}`, `assets/event/${ev}/player_${g}/${k}.png`])));
-    const need = list.filter(([k]) => !scene.textures.exists(k) && !(scene.registry.get('eventTried') || {})[k]);
-    const done = () => {
-      const tried = scene.registry.get('eventTried') || {}; need.forEach(([k]) => { tried[k] = true; }); scene.registry.set('eventTried', tried);
-      D.EVENT_FISH.filter(f => f.event === ev).forEach(f => { const k = 'fish_' + f.id; if (!scene.textures.exists(k)) { if (f.rarity === 'eventHidden') makeFairy(scene, k, 'winter'); else makeFish(scene, k, f); } });
-      cb && cb();
-    };
-    if (!need.length) return done();
-    need.forEach(([k, u]) => scene.load.image(k, u));
-    scene.load.once('complete', done);
-    scene.load.start();
+    const fillMissing = () => D.EVENT_FISH.filter(f => f.event === ev).forEach(f => { const k = 'fish_' + f.id; if (!scene.textures.exists(k)) { if (f.rarity === 'eventHidden') makeFairy(scene, k, 'winter'); else makeFish(scene, k, f); } });
+    if (list.every(([k]) => scene.textures.exists(k))) { fillMissing(); if (onSkin) onSkin(); if (cb) cb(); return; }
+    // 先下圣诞装（马上要用），鱼图后下（钓到才用），免得几十张图一起抢网速
+    const live = () => scene.sys && scene.sys.isActive();
+    const all = ps => Promise.all(ps.map(([k, u]) => loadTex(scene, k, u)));
+    all(list.filter(([k]) => k.startsWith('player_')))
+      .then(() => all(list.filter(([k]) => !k.startsWith('player_'))))
+      .then(() => { if (live()) { fillMissing(); if (cb) cb(); } });
+    if (onSkin) all(list.filter(([k]) => k.startsWith('player_'))).then(() => { if (live()) onSkin(); }); // 同一批请求，不会重复下载
   }
+  // 背景：最近用过的 3 张留在内存里（来回切海边 / 河边不用重新下载），其余释放，手机内存吃不消
+  const bgMRU = [];
   function ensureBg(scene, key, cb) {
     const tm = scene.textures;
-    const done = () => {
-      if (!tm.exists(key)) { const [kind, s0, w0] = key.split('_'), ev = s0 === 'event', s = ev ? 'winter' : s0, w = ev ? 'sea' : w0; if (kind === 'bgp') makeBg(scene, key, s, w, 1080, 1920); else makeBg(scene, key, s, w, 1920, 1080); }
-      tm.getTextureKeys().forEach(k => { if (/^bgp?_/.test(k) && k !== key) tm.remove(k); });
-      cb();
-    };
-    if (tm.exists(key)) return done();
-    scene.load.image(key, bgPath(key));
-    scene.load.once('complete', done);
-    scene.load.start();
+    loadTex(scene, key, bgPath(key)).then(ok => {
+      if (!ok && !tm.exists(key)) { // 下载失败才画占位，下次切过来会再试
+        failed.add(key);
+        const [kind, s0, w0] = key.split('_'), ev = s0 === 'event', s = ev ? 'winter' : s0, w = ev ? 'sea' : w0;
+        if (kind === 'bgp') makeBg(scene, key, s, w, 1080, 1920); else makeBg(scene, key, s, w, 1920, 1080);
+      }
+      const i = bgMRU.indexOf(key); if (i >= 0) bgMRU.splice(i, 1); bgMRU.unshift(key);
+      bgMRU.splice(3).forEach(k => { if (tm.exists(k)) tm.remove(k); });
+      if (scene.sys && scene.sys.isActive()) cb();
+    });
+  }
+  // 空闲时先把可能切过去的背景下载好（同季节的另一个钓场），切换时就是瞬间
+  function prefetchBg(scene, key) {
+    setTimeout(() => { if (!scene.textures.exists(key)) fetch(bgPath(key)).catch(() => {}); }, 1500); // 只放进浏览器缓存，不占内存
   }
 
   function addBg(scene, Lx, key) {
@@ -441,7 +476,7 @@
       const ty = P ? H * 0.28 : 330;
       if (has(this, 'ui_logo')) fit(this.add.image(W / 2, ty, 'ui_logo'), P ? 960 : 900, 450);
       T(this, W / 2, ty, '四季钓场', P ? 170 : 150, '#ffffff', { stroke: '#4a2f17', strokeThickness: 14 }).setOrigin(0.5);
-      TB(this, W / 2, ty + (P ? 170 : 150), `本周：${D.SEASON_CN[sc.season]}季 · 此刻：${D.WEATHER_CN[sc.weather]}天`, 42, '#ffffff', { stroke: '#4a2f17', strokeThickness: 6 }).setOrigin(0.5);
+      TB(this, W / 2, ty + (P ? 170 : 150), `当前：${D.SEASON_CN[sc.season]}季 · ${D.WEATHER_CN[sc.weather]}天`, 42, '#ffffff', { stroke: '#4a2f17', strokeThickness: 6 }).setOrigin(0.5);
       const start = () => { A.unlock(); this.scene.start('Game'); };
       const go = () => { if (this.picker) return; if (getChar()) start(); else this.pickChar(start); }; // 第一次开始先选角色
       button(this, W / 2, P ? H * 0.55 : 680, P ? 600 : 460, P ? 160 : 130, '开始钓鱼', go);
@@ -556,12 +591,15 @@
       return { x: fx * iw * s, y: Lx.H - (1 - fy) * ih * s };
     }
     floatTarget(d) { return this.winterRiver() ? this.iceHole() : this.far(d); }
-    // 浮标落点。圣诞场横屏的码头往右伸得更远，按圣诞背景（1920×1080，cover + 左下对齐）的水面重算，免得近投落在码头上
+    // 浮标落点：每张背景单独标一段水面（背景图里的相对位置 [近投 x, y, 远投 x, y]），按 cover + 左下对齐换算到画面
+    // 以前横屏用固定的屏幕坐标，宽屏时近投会落在码头桩子上
     far(d) {
-      const Lx = this.Lx;
-      if (!D.EVENTS[this.water] || Lx.P) return Lx.far(d);
-      const s = Math.max(Lx.W / 1920, Lx.H / 1080);
-      return { x: Math.min(Lx.W - 120, (0.56 + 0.30 * d) * 1920 * s), y: Lx.H - (1 - (0.74 - 0.16 * d)) * 1080 * s };
+      const Lx = this.Lx, key = D.EVENTS[this.water] ? this.water : `${this.sc.season}_${this.water}`;
+      const t = (Lx.P ? LAND_P : LAND_L)[key];
+      if (!t) return Lx.far(d);
+      const iw = Lx.P ? 1080 : 1920, ih = Lx.P ? 1920 : 1080, s = Math.max(Lx.W / iw, Lx.H / ih);
+      const fx = t[0] + (t[2] - t[0]) * d, fy = t[1] + (t[3] - t[1]) * d;
+      return { x: Math.min(Lx.W - (Lx.P ? 90 : 120), fx * iw * s), y: Phaser.Math.Clamp(Lx.H - (1 - fy) * ih * s, Lx.hudH + 90, Lx.H - 80) };
     }
 
     // ---------- HUD ----------
@@ -658,11 +696,14 @@
       this.sc.water = this.water;
       const ev = D.EVENTS[this.water] ? this.water : null;
       SKIN = ev; // 圣诞场自动换圣诞装，回到海边 / 河边换回来
-      if (ev) ensureEvent(this, ev, () => { if (this.player.scene) this.player.setTexture(pkey(poseName(this.player.texture.key))); });
       if (this.player) this.player.setTexture(pkey(poseName(this.player.texture.key)));
       this.placePlayer();
       const key = this.bgKey();
-      ensureBg(this, key, () => { if (!this.bg.scene || this.bgKey() !== key) return; this.bg.setTexture(key).setVisible(true); this.bg.setScale(bgMap(this.Lx, this.bg.texture).s); });
+      const skin = () => { if (!ev) return; const dress = () => { if (this.player.scene) this.player.setTexture(pkey(poseName(this.player.texture.key))); }; ensureEvent(this, ev, dress, dress); };
+      ensureBg(this, key, () => { skin(); if (!this.bg.scene || this.bgKey() !== key) return; this.bg.setTexture(key).setVisible(true); this.bg.setScale(bgMap(this.Lx, this.bg.texture).s); }); // 背景先下，节日素材排在后面
+      const pre = this.Lx.P ? 'bgp' : 'bg'; // 预下载其他钓场的背景
+      ['sea', 'river'].filter(w => w !== this.water).forEach(w => prefetchBg(this, `${pre}_${this.sc.season}_${w}`));
+      if (xmasOn() && !D.EVENTS[this.water]) prefetchBg(this, `${pre}_event_xmas`);
       const rainy = this.sc.weather === 'rainy';
       this.dim.setFillStyle(0x1a2a3a, rainy ? 0.28 : 0);
       if (rainy && !ev) this.rain.start(); else this.rain.stop();
