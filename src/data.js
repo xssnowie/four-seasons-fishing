@@ -13,7 +13,7 @@
     exotic:  { cn: '奇珍异兽', prob: 5, safe: 0.20, strength: 0.60, reelTime: 6.0, weight: [10, 90],     color: 0xa04dff, folder: 'exotic' },
     monster: { cn: '怪兽',     prob: 1, safe: 0.19, strength: 0.70, reelTime: 6.5, weight: [500, 6000],  color: 0xe8453c, folder: 'monster' },
     fairy:   { cn: '小隐藏',   prob: 0.01, safe: 0.18, strength: 0.55, reelTime: 5.0, weight: [38, 46],     color: 0xff8fc8, folder: 'fairy' },
-    eventHidden: { cn: '限定隐藏', prob: 0.01, safe: 0.18, strength: 0.55, reelTime: 5.0, weight: [60, 75], color: 0xd94848, folder: 'event' },
+    eventHidden: { cn: '限定隐藏', prob: 0.001, safe: 0.18, strength: 0.55, reelTime: 5.0, weight: [60, 75], color: 0xd94848, folder: 'event' },
     goddess: { cn: '大隐藏',   prob: 0.001, safe: 0.17, strength: 0.65, reelTime: 6.0, weight: [48, 52],     color: 0x1fa8d8, folder: 'fairy' },
   };
   const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy', 'goddess', 'eventHidden'];
@@ -178,7 +178,15 @@
 
   // ---- 节日限定场：独立一套可钓物，不算进上面 99 种图鉴和成就 ----
   // 圣诞场：每年 12 月（UTC+8）开放；普通 40 · 稀有 20 · 奇珍异兽 5 · 限定隐藏 1
-  const EVENTS = { xmas: { id: 'xmas', cn: '圣诞', month: 11, when: '每年 12 月' } };
+  // table：限定场的出现率（%）。base = 普通场的可钓物（海 + 河，跟当前季节、天气），event = 限定可钓物；合计 100
+  // 小隐藏、大隐藏不在限定场出现；抛得远近照样影响（d=0.5 时就是这里的值）
+  const EVENTS = { xmas: { id: 'xmas', cn: '圣诞', month: 11, when: '每年 12 月', table: [
+    ['common', 'base', 30], ['common', 'event', 38.999],
+    ['rare', 'base', 10], ['rare', 'event', 15],
+    ['exotic', 'base', 1], ['exotic', 'event', 4.5],
+    ['monster', 'base', 0.5],
+    ['eventHidden', 'event', 0.001],
+  ] } };
   // 圣诞限定可钓物介绍（对照批次 11、12 的图写）
   const EVENT_DESC = {
     candycane: '红白斜条纹裹满全身，像一根会游泳的拐杖糖，闻起来甜甜的。',

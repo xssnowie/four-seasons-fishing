@@ -39,38 +39,49 @@
     return new Date((now == null ? Date.now() : now) + 8 * HOUR).getUTCMonth() === ev.month;
   }
 
-  function eligible(rarity, scene) {
-    const pool = D.EVENTS[scene.water] ? D.EVENT_FISH.filter(f => f.event === scene.water) : D.FISH; // 限定场只钓限定可钓物
+  // 某一类可钓物在当前场景的鱼池。限定场里 src='base' 是普通场的鱼（海、河都算，跟季节天气），'event' 是限定物
+  function eligible(rarity, scene, src) {
+    const ev = D.EVENTS[scene.water];
+    if (ev && !src) return eligible(rarity, scene, 'event').concat(eligible(rarity, scene, 'base'));
+    const pool = ev ? (src === 'event' ? D.EVENT_FISH.filter(f => f.event === scene.water) : D.FISH) : D.FISH;
     return pool.filter(f => f.rarity === rarity &&
-      (f.water == null || f.water === scene.water) &&
+      (ev || f.water == null || f.water === scene.water) &&
       (f.season == null || f.season === scene.season) &&
       (f.weather == null || f.weather === scene.weather));
   }
 
-  // 抛竿距离 d（0..1）影响稀有概率：d=0.5 时就是 data.js 里的配置值；越远普通鱼越少。
+  // 出现率表：[类别, 来源, 概率%]。普通场按 RARITY.prob；限定场按 EVENTS[x].table
+  function rateTable(scene) {
+    const ev = D.EVENTS[scene.water];
+    if (ev) return ev.table.map(([r, src, p]) => ({ r, src, p }));
+    return D.RARITY_ORDER.filter(r => r !== 'eventHidden').map(r => ({ r, src: null, p: D.RARITY[r].prob }));
+  }
+
+  // 抛竿距离 d（0..1）影响稀有概率：d=0.5 时就是配置值；越远普通鱼越少。
+  // 返回每一项的权重；当前场景没有这类鱼 → 这份概率还给普通鱼（限定场还给普通·限定）
   function rarityWeights(scene, d) {
     const k = 0.7 + 0.6 * (d == null ? 0.5 : d); // 0.7 .. 1.3
-    const w = {};
+    const rows = rateTable(scene), commons = rows.filter(x => x.r === 'common');
     let shifted = 0;
-    D.RARITY_ORDER.forEach(r => {
-      if (r === 'common') return;
-      const base = D.RARITY[r].prob;
-      const v = eligible(r, scene).length ? base * k : 0; // 当前场景没有这类鱼 → 这份概率还给普通鱼
-      w[r] = v;
-      shifted += v;
+    rows.forEach(x => {
+      if (x.r === 'common') return;
+      x.w = eligible(x.r, scene, x.src || undefined).length ? x.p * k : 0;
+      shifted += x.w;
     });
-    w.common = 100 - shifted;
-    return w;
+    // 普通鱼分剩下的：按配置比例分（限定场 30 : 38.999），没鱼的那份给另一份
+    const cp = commons.reduce((a, x) => a + x.p, 0), rest = 100 - shifted;
+    commons.forEach(x => { x.w = rest * x.p / cp; });
+    return rows;
   }
 
   function pickFish(scene, d, rand) {
     rand = rand || Math.random;
-    const w = rarityWeights(scene, d);
-    let x = rand() * 100, rarity = 'common';
-    for (const r of D.RARITY_ORDER) { if (x < w[r]) { rarity = r; break; } x -= w[r]; }
-    const pool = eligible(rarity, scene);
+    const rows = rarityWeights(scene, d);
+    let x = rand() * 100, row = rows.find(r => r.r === 'common');
+    for (const r of rows) { if (x < r.w) { row = r; break; } x -= r.w; }
+    const pool = eligible(row.r, scene, row.src || undefined);
     const fish = pool[Math.floor(rand() * pool.length)];
-    const [lo, hi] = D.RARITY[rarity].weight;
+    const [lo, hi] = D.RARITY[row.r].weight;
     const weight = Math.round((lo + (hi - lo) * Math.pow(rand(), 1.8)) * 100) / 100; // 偏小，大鱼难得
     return { fish, weight };
   }
@@ -167,7 +178,7 @@
     return { points, maxPoints, found, totalFish: D.FISH.length, top: fishOnly.slice(0, 10), topMonsters: monsters.slice(0, 5) };
   }
 
-  const api = { sceneAt, eventActive, eligible, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
+  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GameLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);
