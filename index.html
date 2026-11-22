@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="四季钓场">
 <meta name="theme-color" content="#0d1430">
 <title>四季钓场</title>
-<link rel="stylesheet" href="assets/font/tangyuan/result.css?v=20261122114657">
+<link rel="stylesheet" href="assets/font/tangyuan/result.css?v=20261122114727">
 <style>
   /* 游戏字体：站酷快乐体（OFL 授权，见 assets/font/OFL.txt） */
   @font-face { font-family: 'ZCOOL KuaiLe'; src: url('assets/font/ZCOOLKuaiLe.woff2') format('woff2'); font-display: block; }
@@ -48,13 +48,28 @@
 </head>
 <body oncontextmenu="return false">
 <div id="game"></div>
-<script src="vendor/phaser.min.js?v=20261122114657"></script>
-<script src="src/data.js?v=20261122114657"></script>
-<script src="src/logic.js?v=20261122114657"></script>
-<script src="src/firebase-config.js?v=20261122114657"></script>
-<script src="src/store.js?v=20261122114657"></script>
-<script src="src/account.js?v=20261122114657"></script>
-<script src="src/audio.js?v=20261122114657"></script>
-<script src="src/main.js?v=20261122114657"></script>
+<script>
+  // 手机浏览器会把关掉的页面存成「预览」快照，重新打开时直接显示旧画面：
+  // 1) 从快照恢复（bfcache）就重新加载；2) 在后台放了 5 分钟以上再回来，有新版本就重新加载（进度已存，不会丢）
+  (function () {
+    addEventListener('pageshow', function (e) { if (e.persisted) location.reload(); });
+    var hiddenAt = 0, ver = function (html) { var m = /src\/main\.js\?v=(\d+)/.exec(html); return m ? m[1] : ''; };
+    var mine = ver(document.documentElement.innerHTML);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { hiddenAt = Date.now(); return; }
+      if (!mine || !hiddenAt || Date.now() - hiddenAt < 5 * 60 * 1000) return;
+      fetch('./?nc=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.text(); })
+        .then(function (t) { var v = ver(t); if (v && v !== mine) location.reload(); }).catch(function () {});
+    });
+  })();
+</script>
+<script src="vendor/phaser.min.js?v=20261122114727"></script>
+<script src="src/data.js?v=20261122114727"></script>
+<script src="src/logic.js?v=20261122114727"></script>
+<script src="src/firebase-config.js?v=20261122114727"></script>
+<script src="src/store.js?v=20261122114727"></script>
+<script src="src/account.js?v=20261122114727"></script>
+<script src="src/audio.js?v=20261122114727"></script>
+<script src="src/main.js?v=20261122114727"></script>
 </body>
 </html>
