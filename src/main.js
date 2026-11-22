@@ -63,6 +63,17 @@
     player_male_wait: { hand: [348, 269], rod: [0.55, -0.62] },
     player_male_reel: { hand: [352, 198], rod: [0.62, -0.50] },
     player_male_celebrate: { hand: [358, 122], rod: [0.25, -0.80] },
+    // 圣诞装（批次 10）导入时已放大到跟原角色同高、脚底对齐，拳头位置单独量
+    player_xmas_female_idle: { hand: [390, 301], rod: [0.36, -0.77] },
+    player_xmas_female_cast: { hand: [418, 224], rod: [0.20, -0.83] },
+    player_xmas_female_wait: { hand: [366, 351], rod: [0.55, -0.62] },
+    player_xmas_female_reel: { hand: [390, 263], rod: [0.62, -0.50] },
+    player_xmas_female_celebrate: { hand: [392, 124], rod: [0.25, -0.80] },
+    player_xmas_male_idle: { hand: [370, 279], rod: [0.36, -0.77] },
+    player_xmas_male_cast: { hand: [392, 219], rod: [0.20, -0.83] },
+    player_xmas_male_wait: { hand: [356, 331], rod: [0.55, -0.62] },
+    player_xmas_male_reel: { hand: [362, 243], rod: [0.62, -0.50] },
+    player_xmas_male_celebrate: { hand: [381, 131], rod: [0.25, -0.80] },
   };
   // 玩家选的角色（只存本机）：'female' | 'male'；没选过是 null
   const CHAR_KEY = 'fishing.char';
@@ -92,6 +103,7 @@
   const PLAYER_SPOT = {
     autumn_river: [0.24, 0.90], autumn_sea: [0.25, 0.88], spring_river: [0.25, 0.86], spring_sea: [0.18, 0.90],
     summer_river: [0.18, 0.82], summer_sea: [0.22, 0.88], winter_river: [0.22, 0.94], winter_sea: [0.30, 0.93],
+    xmas: [0.45, 0.955], // 节日场不分季节，按场地取
   };
   // 横屏背景（1920×1080）大多在默认位置就有码头；冬天的河默认位置正好是背景里的木凳，挪到凳子右边的雪堆上
   const PLAYER_SPOT_L = { winter_river: [0.33, 0.93] };
@@ -616,7 +628,7 @@
 
     // 竖屏：人物站到当前背景的码头 / 岸上（横屏的背景都在同一位置有码头，不用换）
     placePlayer() {
-      const Lx = this.Lx, key = `${this.sc.season}_${this.water}`, spot = (Lx.P ? PLAYER_SPOT : PLAYER_SPOT_L)[key];
+      const Lx = this.Lx, key = D.EVENTS[this.water] ? this.water : `${this.sc.season}_${this.water}`, spot = (Lx.P ? PLAYER_SPOT : PLAYER_SPOT_L)[key];
       if (!this.playerHome) this.playerHome = { x: Lx.player.x, y: Lx.player.y }; // 布局给的默认位置
       if (!spot) { Lx.player.x = this.playerHome.x; Lx.player.y = this.playerHome.y; }
       else {
@@ -897,6 +909,7 @@
       }
       const line = big ? '凡人，你唤醒了水之女神。' : fish.rarity === 'eventHidden' ? '呵呵呵～圣诞快乐！这份礼物送给你。' : '凡人，你钓到本仙了～';
       const bubble = TB(this, x, y - (big ? 640 : 500), line, 46, big ? '#0b6e99' : '#c2185b', { backgroundColor: '#fffaf0', padding: { x: 24, y: 14 } }).setOrigin(0.5).setDepth(48).setAlpha(0);
+      bubble.x = Phaser.Math.Clamp(bubble.x, bubble.width / 2 + 24, this.Lx.W - bubble.width / 2 - 24); // 台词长时别超出画面
       this.tweens.add({ targets: bubble, alpha: 1, delay: big ? 1900 : 1300, duration: 300 });
       this.time.delayedCall(big ? 4600 : 3300, () => { [glow, f, bubble].forEach(o => o.destroy()); if (big) this.dim.setFillStyle(0x1a2a3a, this.sc.weather === 'rainy' ? 0.28 : 0); done(); });
     }
