@@ -76,7 +76,17 @@
   }
   // 登录的账号还没选过角色，就把这台设备上选的带进账号
   window.Store.onChange(S => { if (S.user && !okChar(S.save.char) && localChar()) setChar(localChar()); });
-  const pkey = pose => (getChar() === 'male' ? 'player_male_' : 'player_') + pose;
+  // 节日限定场：12 月自动开放；?event=xmas 可以提前预览
+  const xmasOn = () => Q.get('event') === 'xmas' || L.eventActive('xmas');
+  let SKIN = null; // 当前场景的节日皮肤（在圣诞场 = 'xmas'）
+  const pkey = pose => {
+    const male = getChar() === 'male';
+    if (SKIN) { const k = `player_${SKIN}_${male ? 'male' : 'female'}_${pose}`; if (game.textures.exists(k)) return k; } // 皮肤素材没到就穿原本的
+    return (male ? 'player_male_' : 'player_') + pose;
+  };
+  const poseName = key => key.replace(/^player_(xmas_(female|male)_|male_)?/, '');
+  // 节日皮肤和原本的姿势一样，拳头位置先沿用原角色（素材到了再细调）
+  const poseOf = key => POSE[key] || POSE[key.replace(/^player_xmas_female_/, 'player_').replace(/^player_xmas_male_/, 'player_male_')] || POSE.player_idle;
 
   // 竖屏背景里人物脚踩的位置（背景图宽、高的比例），按每张图的码头 / 岸边量的
   const PLAYER_SPOT = {
@@ -112,8 +122,12 @@
   function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; }
   function fmtW(w) { return w >= 1000 ? (w / 1000).toFixed(2) + ' 吨' : w.toFixed(2) + ' kg'; }
   function mmss(ms) { const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, p2 = n => String(n).padStart(2, '0'); return (h ? h + ':' + p2(m) : m) + ':' + p2(s % 60); }
-  function sceneLabel(sc) { return `${D.SEASON_CN[sc.season]} · ${D.WEATHER_CN[sc.weather]} · ${D.WATER_CN[sc.water]}`; }
+  function sceneLabel(sc) {
+    if (D.EVENTS[sc.water]) return `${D.WATER_CN[sc.water]} · ${sc.weather === 'rainy' ? '大雪' : '晴'}`; // 节日场不分季节
+    return `${D.SEASON_CN[sc.season]} · ${D.WEATHER_CN[sc.weather]} · ${D.WATER_CN[sc.water]}`;
+  }
   function condText(f) {
+    if (f.event) return `${D.EVENTS[f.event].cn}限定场 · ${D.EVENTS[f.event].when}`;
     if (f.rarity === 'goddess') return '任何场景（极低概率）';
     if (f.rarity === 'fairy') return `${D.SEASON_CN[f.season]}季 · 天气水域不限（低概率）`;
     const p = [];
@@ -268,6 +282,7 @@
   function makeSimple(scene, key, kind) {
     const g = scene.make.graphics({ x: 0, y: 0, add: false });
     if (kind === 'float') { g.fillStyle(0xffffff, 1); g.fillCircle(32, 40, 22); g.fillStyle(0xe8453c, 1); g.slice(32, 40, 22, Math.PI, 0, false); g.fillPath(); g.fillRect(29, 2, 6, 20); g.generateTexture(key, 64, 64); }
+    else if (kind === 'flake') { g.fillStyle(0xffffff, 0.95); g.fillCircle(8, 8, 7); g.generateTexture(key, 16, 16); }
     else if (kind === 'drop') { g.lineStyle(3, 0xdfefff, 0.9); g.lineBetween(10, 0, 2, 30); g.generateTexture(key, 12, 30); }
     else if (kind === 'badge') { g.fillStyle(0xd9a740, 1); g.fillCircle(128, 128, 120); g.fillStyle(0xffe08a, 1); g.fillCircle(128, 128, 96); g.fillStyle(0xd9a740, 1); g.fillTriangle(128, 60, 80, 170, 176, 170); g.fillTriangle(128, 196, 80, 90, 176, 90); g.generateTexture(key, 256, 256); }
     g.destroy();
@@ -308,7 +323,7 @@
         else if (k.startsWith('badge_')) makeSimple(this, k, 'badge');
         // ui_* 缺图时由界面用图形绘制
       });
-      makeSimple(this, 'drop', 'drop');
+      makeSimple(this, 'drop', 'drop'); makeSimple(this, 'flake', 'flake');
       this.registry.set('missing', missing);
       console.log(`[fishing] 素材 ${manifest().length - missing.size}/${manifest().length} 张已就位，其余用占位图`);
       // 等游戏字体加载好再进标题页，否则第一屏会先用系统字体画（最多等 4 秒）
@@ -362,11 +377,30 @@
   }
 
   // 按需加载一张背景：先试 assets/ 里的图，没有就画占位；同时释放其他背景，手机内存吃不消
-  function bgPath(key) { const [kind, s, w] = key.split('_'); return kind === 'bgp' ? `assets/bg/portrait/${s}_${w}.png` : `assets/bg/${s}_${w}.png`; }
+  function bgPath(key) {
+    const [kind, s, w] = key.split('_');
+    if (s === 'event') return `assets/event/${w}/${kind === 'bgp' ? 'bg_portrait' : 'bg'}.png`; // 节日场：bg_event_xmas / bgp_event_xmas
+    return kind === 'bgp' ? `assets/bg/portrait/${s}_${w}.png` : `assets/bg/${s}_${w}.png`;
+  }
+  // 节日场素材（可钓物 + 皮肤）进场才下载，不拖慢首次打开；缺图用占位
+  function ensureEvent(scene, ev, cb) {
+    const list = D.EVENT_FISH.filter(f => f.event === ev).map(f => ['fish_' + f.id, `assets/event/${ev}/fish/${f.file}.png`]);
+    ['female', 'male'].forEach(g => ['idle', 'cast', 'wait', 'reel', 'celebrate'].forEach(k => list.push([`player_${ev}_${g}_${k}`, `assets/event/${ev}/player_${g}/${k}.png`])));
+    const need = list.filter(([k]) => !scene.textures.exists(k) && !(scene.registry.get('eventTried') || {})[k]);
+    const done = () => {
+      const tried = scene.registry.get('eventTried') || {}; need.forEach(([k]) => { tried[k] = true; }); scene.registry.set('eventTried', tried);
+      D.EVENT_FISH.filter(f => f.event === ev).forEach(f => { const k = 'fish_' + f.id; if (!scene.textures.exists(k)) { if (f.rarity === 'eventHidden') makeFairy(scene, k, 'winter'); else makeFish(scene, k, f); } });
+      cb && cb();
+    };
+    if (!need.length) return done();
+    need.forEach(([k, u]) => scene.load.image(k, u));
+    scene.load.once('complete', done);
+    scene.load.start();
+  }
   function ensureBg(scene, key, cb) {
     const tm = scene.textures;
     const done = () => {
-      if (!tm.exists(key)) { const [kind, s, w] = key.split('_'); if (kind === 'bgp') makeBg(scene, key, s, w, 1080, 1920); else makeBg(scene, key, s, w, 1920, 1080); }
+      if (!tm.exists(key)) { const [kind, s0, w0] = key.split('_'), ev = s0 === 'event', s = ev ? 'winter' : s0, w = ev ? 'sea' : w0; if (kind === 'bgp') makeBg(scene, key, s, w, 1080, 1920); else makeBg(scene, key, s, w, 1920, 1080); }
       tm.getTextureKeys().forEach(k => { if (/^bgp?_/.test(k) && k !== key) tm.remove(k); });
       cb();
     };
@@ -445,6 +479,7 @@
       this.playerHome = null; // 转屏重排时布局变了，默认站位要重新取
       this.save = window.Store.save; // 同一个对象：登录 / 云端合并时原地更新
       this.water = (() => { try { return localStorage.getItem('fishing.water') || 'sea'; } catch (e) { return 'sea'; } })();
+      if (D.EVENTS[this.water] && !xmasOn()) this.water = 'sea'; // 活动结束了，回到海边
       this.sc = currentScene(this.water);
       this.state = 'idle';
       this.overlay = null;
@@ -456,6 +491,10 @@
       this.rain = this.add.particles(0, 0, 'drop', {
         x: { min: -100, max: Lx.W + 300 }, y: -40, lifespan: Lx.H / 1.5, speedY: { min: 1300, max: 1700 }, speedX: { min: -320, max: -240 },
         quantity: Math.ceil(Lx.W / 400), frequency: 16, alpha: { start: 0.7, end: 0.3 }, emitting: false,
+      }).setDepth(6);
+      this.snow = this.add.particles(0, 0, 'flake', { // 圣诞场一直下雪；雨天下得大一点
+        x: { min: -100, max: Lx.W + 100 }, y: -20, lifespan: Lx.H / 0.11, speedY: { min: 70, max: 140 }, speedX: { min: -40, max: 30 },
+        scale: { min: 0.35, max: 1.1 }, quantity: 1, frequency: 90, alpha: { start: 0.95, end: 0.6 }, emitting: false,
       }).setDepth(6);
       this.time.addEvent({ delay: 110, loop: true, callback: () => this.ripple() });
 
@@ -488,7 +527,7 @@
       this.tickClock();
       let uid = window.Store.user && window.Store.user.uid;
       const offStore = window.Store.onChange(S => { // 登录 / 退出后，开着的榜单刷新一下
-        const want = pkey(this.player.texture.key.replace(/^player_(male_)?/, '')); // 账号同步下来的角色可能不一样
+        const want = pkey(poseName(this.player.texture.key)); // 账号同步下来的角色可能不一样
         if (this.player.texture.key !== want && has(this, want)) this.player.setTexture(want);
         const u = S.user && S.user.uid; if (u === uid) return; uid = u;
         if (this.overlay && this.overlayKind === 'rank') this.openRank();
@@ -496,7 +535,7 @@
       this.events.once('shutdown', offStore);
     }
 
-    bgKey() { return `${this.Lx.P ? 'bgp' : 'bg'}_${this.sc.season}_${this.water}`; }
+    bgKey() { return D.EVENTS[this.water] ? `${this.Lx.P ? 'bgp' : 'bg'}_event_${this.water}` : `${this.Lx.P ? 'bgp' : 'bg'}_${this.sc.season}_${this.water}`; }
     winterRiver() { return this.sc.season === 'winter' && this.water === 'river'; }
     iceHole() { // 按素材规定的比例算（1920×1080 / 1080×1920），不依赖背景是否已加载完
       const Lx = this.Lx, iw = Lx.P ? 1080 : 1920, ih = Lx.P ? 1920 : 1080, s = Math.max(Lx.W / iw, Lx.H / ih), [fx, fy] = ICE[Lx.P ? 'portrait' : 'landscape'];
@@ -516,14 +555,18 @@
       this.clockText = TB(this, tx + 2, Lx.P ? 74 : 62, '', Lx.P ? 26 : 22, '#ffe9c4', { stroke: '#3a2410', strokeThickness: 4 }).setDepth(d + 1);
       const mk = (x, y, w, h, label, fn, sec) => button(this, x, y, w, h, label, fn, { secondary: sec, size: 30 }).setDepth(d + 1);
       if (Lx.P) {
-        const y = 172, bw = 196, step = 209, x0 = 22 + bw / 2;
+        const ex = xmasOn(), y = 172, bw = ex ? 162 : 196, step = ex ? 174 : 209, x0 = 22 + bw / 2; // 圣诞场开放时多一个按钮，整排缩窄
         this.waterBtns = { sea: mk(x0, y, bw, 84, '海边', () => this.switchWater('sea'), true), river: mk(x0 + step, y, bw, 84, '河边', () => this.switchWater('river'), true) };
-        mk(x0 + step * 2, y, bw, 84, '图鉴', () => this.openBook());
-        mk(x0 + step * 3, y, bw, 84, '成就', () => this.openAch());
-        mk(x0 + step * 4, y, bw, 84, '榜单', () => this.openRank());
+        let i = 2;
+        if (ex) this.waterBtns.xmas = mk(x0 + step * i++, y, bw, 84, '圣诞', () => this.switchWater('xmas'), true);
+        mk(x0 + step * i++, y, bw, 84, '图鉴', () => this.openBook());
+        mk(x0 + step * i++, y, bw, 84, '成就', () => this.openAch());
+        mk(x0 + step * i++, y, bw, 84, '榜单', () => this.openRank());
         this.muteBtn = this.soundButton(W - Math.max(70, orn + 40), 66, 96, mk);
       } else {
-        this.waterBtns = { sea: mk(760, 56, 170, 80, '海边', () => this.switchWater('sea'), true), river: mk(950, 56, 170, 80, '河边', () => this.switchWater('river'), true) };
+        const ex = xmasOn(), wb = ex ? 150 : 170, ws = ex ? 165 : 190, wx = ex ? 720 : 760;
+        this.waterBtns = { sea: mk(wx, 56, wb, 80, '海边', () => this.switchWater('sea'), true), river: mk(wx + ws, 56, wb, 80, '河边', () => this.switchWater('river'), true) };
+        if (ex) this.waterBtns.xmas = mk(wx + ws * 2, 56, wb, 80, '圣诞', () => this.switchWater('xmas'), true);
         const r = Math.max(0, orn - 40); // 给右边救生圈让位
         mk(W - 660 - r, 56, 170, 80, '图鉴', () => this.openBook());
         mk(W - 470 - r, 56, 170, 80, '成就', () => this.openAch());
@@ -561,13 +604,14 @@
 
     refreshHud() {
       this.sceneText.setText(sceneLabel(this.sc));
-      ['sea', 'river'].forEach(w => this.waterBtns[w].setAlpha(w === this.water ? 1 : 0.55));
+      Object.keys(this.waterBtns).forEach(w => this.waterBtns[w].setAlpha(w === this.water ? 1 : 0.55));
     }
 
     tickClock() {
       const s = currentScene(this.water);
       this.clockText.setText(`下次变天 ${mmss(s.nextWeatherIn)} · 换季还有 ${Math.ceil(s.nextSeasonIn / 86400000)} 天`);
       if (s.season !== this.sc.season || s.weather !== this.sc.weather) { this.sc = s; this.applyScene(false); }
+      if (D.EVENTS[this.water] && !xmasOn() && this.state === 'idle') { this.switchWater('sea'); this.flash('圣诞限定场已经结束，明年 12 月见～'); }
     }
 
     // 竖屏：人物站到当前背景的码头 / 岸上（横屏的背景都在同一位置有码头，不用换）
@@ -585,14 +629,20 @@
 
     applyScene(first) {
       this.sc.water = this.water;
+      const ev = D.EVENTS[this.water] ? this.water : null;
+      SKIN = ev; // 圣诞场自动换圣诞装，回到海边 / 河边换回来
+      if (ev) ensureEvent(this, ev, () => { if (this.player.scene) this.player.setTexture(pkey(poseName(this.player.texture.key))); });
+      if (this.player) this.player.setTexture(pkey(poseName(this.player.texture.key)));
       this.placePlayer();
       const key = this.bgKey();
       ensureBg(this, key, () => { if (!this.bg.scene || this.bgKey() !== key) return; this.bg.setTexture(key).setVisible(true); this.bg.setScale(bgMap(this.Lx, this.bg.texture).s); });
       const rainy = this.sc.weather === 'rainy';
       this.dim.setFillStyle(0x1a2a3a, rainy ? 0.28 : 0);
-      if (rainy) this.rain.start(); else this.rain.stop();
-      A.setRain(rainy);
-      if (this.musicSeason !== this.sc.season) { this.musicSeason = this.sc.season; A.startMusic(this.sc.season); }
+      if (rainy && !ev) this.rain.start(); else this.rain.stop();
+      if (ev) { this.snow.setFrequency(rainy ? 30 : 90, rainy ? 2 : 1); this.snow.start(); } else this.snow.stop();
+      A.setRain(rainy && !ev);
+      const song = ev || this.sc.season; // 圣诞场放圣诞 BGM
+      if (this.musicSeason !== song) { this.musicSeason = song; A.startMusic(song); }
       this.refreshHud();
       if (!first) this.flash(`天气变了：${sceneLabel(this.sc)}`);
     }
@@ -607,7 +657,7 @@
     }
 
     ripple() {
-      if (this.sc.weather !== 'rainy') return;
+      if (this.sc.weather !== 'rainy' || D.EVENTS[this.water]) return;
       const Lx = this.Lx;
       let x, y;
       if (this.winterRiver()) { const h = this.iceHole(); x = h.x + Phaser.Math.Between(-80, 80); y = h.y + Phaser.Math.Between(-18, 18); }
@@ -668,7 +718,7 @@
     }
 
     rollFish(d) {
-      const force = Q.get('force') && D.FISH.find(f => f.id === Q.get('force'));
+      const force = Q.get('force') && D.FISH.concat(D.EVENT_FISH).find(f => f.id === Q.get('force'));
       if (force) { const [lo, hi] = D.RARITY[force.rarity].weight; return { fish: force, weight: Math.round((lo + (hi - lo) * Math.random()) * 100) / 100 }; }
       return L.pickFish(this.sc, d);
     }
@@ -782,7 +832,7 @@
 
     // 鱼竿几何：手柄尾端（拳头后面一点）→ 拳头 → 竿尖；收线时按张力往下弯
     rodGeom() {
-      const Lx = this.Lx, S = Lx.player.size, p = POSE[this.player.texture.key] || POSE.player_idle;
+      const Lx = this.Lx, S = Lx.player.size, p = poseOf(this.player.texture.key);
       const hand = { x: Lx.player.x + (p.hand[0] / 512 - 0.5) * S, y: Lx.player.y - S + p.hand[1] / 512 * S };
       if (this.rodImg) { // 鱼竿素材：按姿势方向旋转，长度比原来的线长一点
         const key = this.state === 'reeling' && has(this, 'player_rod_bent') ? 'player_rod_bent' : 'player_rod', R = ROD_IMG[key];
@@ -825,7 +875,7 @@
       const res = L.recordCatch(this.save, fish, weight, this.sc, Date.now());
       window.Store.commit();
       const show = () => this.showResult(fish, weight, res);
-      if (fish.rarity === 'fairy' || fish.rarity === 'goddess') return this.fairyRise(show, fish);
+      if (fish.rarity === 'fairy' || fish.rarity === 'goddess' || fish.rarity === 'eventHidden') return this.fairyRise(show, fish);
       if (fish.rarity === 'monster') { this.cameras.main.shake(1200, 0.014); A.play('monster'); if (navigator.vibrate) try { navigator.vibrate([200, 80, 300]); } catch (e) { /* ignore */ } this.time.delayedCall(900, show); return; }
       A.play(fish.rarity === 'common' ? 'catch' : fish.rarity === 'rare' ? 'rare' : 'exotic');
       show();
@@ -845,7 +895,7 @@
         const s = this.add.star(x + Phaser.Math.Between(-200, 200), y + Phaser.Math.Between(-60, 40), 5, 6, 14, big ? 0xbff0ff : 0xfff6a8).setDepth(47).setAlpha(0);
         this.tweens.add({ targets: s, y: s.y - Phaser.Math.Between(150, 400), alpha: { from: 1, to: 0 }, angle: 180, duration: 1800, delay: i * 50 });
       }
-      const line = big ? '凡人，你唤醒了水之女神。' : '凡人，你钓到本仙了～';
+      const line = big ? '凡人，你唤醒了水之女神。' : fish.rarity === 'eventHidden' ? '呵呵呵～圣诞快乐！这份礼物送给你。' : '凡人，你钓到本仙了～';
       const bubble = TB(this, x, y - (big ? 640 : 500), line, 46, big ? '#0b6e99' : '#c2185b', { backgroundColor: '#fffaf0', padding: { x: 24, y: 14 } }).setOrigin(0.5).setDepth(48).setAlpha(0);
       this.tweens.add({ targets: bubble, alpha: 1, delay: big ? 1900 : 1300, duration: 300 });
       this.time.delayedCall(big ? 4600 : 3300, () => { [glow, f, bubble].forEach(o => o.destroy()); if (big) this.dim.setFillStyle(0x1a2a3a, this.sc.weather === 'rainy' ? 0.28 : 0); done(); });
@@ -853,7 +903,7 @@
 
     showResult(fish, weight, res) {
       const R = D.RARITY[fish.rarity], P = this.Lx.P, W = this.Lx.W;
-      const titles = { common: '钓到了！', rare: '稀有鱼！', exotic: '奇珍异兽出现！', monster: '怪兽被你钓起来了！！', fairy: '小隐藏 · 四季小仙女', goddess: '大隐藏 · 水之女神' };
+      const titles = { common: '钓到了！', rare: '稀有鱼！', exotic: '奇珍异兽出现！', monster: '怪兽被你钓起来了！！', fairy: '小隐藏 · 四季小仙女', goddess: '大隐藏 · 水之女神', eventHidden: '圣诞限定隐藏！' };
       const pw = P ? 960 : 900, ph = P ? 1060 : 700;
       const o = this.openOverlay(pw, ph, 'ui_panel', () => this.setIdle());
       const top = this.Lx.oy - ph / 2, at = f => top + ph * f;
@@ -930,13 +980,19 @@
       if (this.busy()) return;
       tab = tab || 'sea'; page = page || 0;
       const b = this.sheet(), o = b.o, P = this.Lx.P, W = this.Lx.W;
-      const found = D.FISH.filter(f => this.save.book[f.id]).length;
-      o.add(T(this, b.left + 50, b.top + 30, `图鉴  ${found} / ${D.FISH.length}`, 48, INK));
+      // 节日限定页签：活动期间，或已经钓到过限定物才显示；不算进 99 种
+      const showX = xmasOn() || D.EVENT_FISH.some(f => this.save.book[f.id]);
+      if (tab === 'xmas' && !showX) tab = 'sea';
+      const xList = D.EVENT_FISH.filter(f => f.event === 'xmas');
+      if (tab === 'xmas') ensureEvent(this, 'xmas'); // 进圣诞页签时补下载限定图（第一次看可能是占位，重开就是正式图）
+      const found = tab === 'xmas' ? xList.filter(f => this.save.book[f.id]).length : D.FISH.filter(f => this.save.book[f.id]).length;
+      o.add(T(this, b.left + 50, b.top + 30, tab === 'xmas' ? `圣诞限定  ${found} / ${xList.length}` : `图鉴  ${found} / ${D.FISH.length}`, 48, INK));
       const TABS = [['sea', '普通·海', f => f.rarity === 'common' && f.water === 'sea'], ['river', '普通·河', f => f.rarity === 'common' && f.water === 'river'],
         ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·隐藏', f => f.rarity === 'monster' || f.rarity === 'fairy' || f.rarity === 'goddess']];
-      const tw = P ? 182 : 230, tstep = P ? 192 : 250, ty = b.top + (P ? 128 : 112);
-      TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openBook(id), { secondary: id !== tab, size: P ? 28 : 30 })));
-      const list = D.FISH.filter(TABS.find(t => t[0] === tab)[2]);
+      if (showX) TABS.push(['xmas', '圣诞限定', f => f.event === 'xmas']);
+      const tstep = Math.min(P ? 192 : 250, (b.w - 60) / TABS.length), tw = tstep - 10, ty = b.top + (P ? 128 : 112); // 页签按面板宽度平分，不会超出
+      TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openBook(id), { secondary: id !== tab, size: P ? (showX ? 24 : 28) : 30 })));
+      const list = (tab === 'xmas' ? xList : D.FISH).filter(TABS.find(t => t[0] === tab)[2]);
       const cw = 164, ch = 190, sx = 183, sy = 200;
       const cols = Math.max(1, Math.floor((b.w - 60) / sx));
       const gridTop = ty + (P ? 60 : 52), footer = P ? 210 : 90;
@@ -973,7 +1029,7 @@
       list.slice(page * per, page * per + per).forEach((f, i) => {
         const cx = gx + (i % cols) * sx, cy = gridTop + ch / 2 + Math.floor(i / cols) * sy;
         const got = this.save.book[f.id], R = D.RARITY[f.rarity];
-        const ck = 'ui_card_' + (f.rarity === 'goddess' ? 'fairy' : f.rarity);
+        const ck = 'ui_card_' + (f.rarity === 'goddess' || f.rarity === 'eventHidden' ? 'fairy' : f.rarity);
         if (has(this, ck)) o.add(this.add.image(cx, cy, ck).setDisplaySize(cw, ch));
         else { const g = this.add.graphics(); g.fillStyle(0xffffff, 1); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18); g.lineStyle(6, R.color, 1); g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 18); o.add(g); }
         const img = fit(this.add.image(cx, cy + 3, 'fish_' + f.id), 132, 104); // 卡片窗口：素材 280 高里的 58–234 像素
@@ -1021,7 +1077,7 @@
       const b = this.sheet(), o = b.o, P = this.Lx.P, SS = window.Store;
       this.overlayKind = 'rank';
       const st = L.stats(this.save);
-      const byId = Object.fromEntries(D.FISH.map(f => [f.id, f]));
+      const byId = Object.fromEntries(D.FISH.concat(D.EVENT_FISH).map(f => [f.id, f]));
       o.add(T(this, b.left + 50, b.top + 30, '我的成就榜', 48, INK));
       const where = SS.user ? `${SS.user.name} · 进度已存到账号` : SS.enabled ? '游客：成绩只存在这台设备，登录后可存到云端' : '成绩只存在这台设备';
       o.add(TB(this, b.left + 50, b.top + 95, `累计钓到 ${this.save.total} 条 · 雨天 ${this.save.rainCatches} 条（${where}）`, 28, '#7a5a3a', { wordWrap: { width: b.w - 160, useAdvancedWrap: true } }));

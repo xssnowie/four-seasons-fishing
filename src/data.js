@@ -3,7 +3,7 @@
   const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   const SEASON_CN = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' };
   const WEATHER_CN = { sunny: '晴', rainy: '雨' };
-  const WATER_CN = { sea: '海', river: '河' };
+  const WATER_CN = { sea: '海', river: '河', xmas: '圣诞场' };
 
   // 稀有度配置。prob = 基础概率（%），抛竿距离居中时的值；safe = 张力安全区宽度；
   // strength = 鱼的挣扎力度；reelTime = 安全区内需要收线的秒数；weight = 重量区间 kg
@@ -13,9 +13,10 @@
     exotic:  { cn: '奇珍异兽', prob: 5, safe: 0.20, strength: 0.60, reelTime: 6.0, weight: [10, 90],     color: 0xa04dff, folder: 'exotic' },
     monster: { cn: '怪兽',     prob: 1, safe: 0.19, strength: 0.70, reelTime: 6.5, weight: [500, 6000],  color: 0xe8453c, folder: 'monster' },
     fairy:   { cn: '小隐藏',   prob: 0.01, safe: 0.18, strength: 0.55, reelTime: 5.0, weight: [38, 46],     color: 0xff8fc8, folder: 'fairy' },
+    eventHidden: { cn: '限定隐藏', prob: 0.01, safe: 0.18, strength: 0.55, reelTime: 5.0, weight: [60, 75], color: 0xd94848, folder: 'event' },
     goddess: { cn: '大隐藏',   prob: 0.001, safe: 0.17, strength: 0.65, reelTime: 6.0, weight: [48, 52],     color: 0x1fa8d8, folder: 'fairy' },
   };
-  const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy', 'goddess'];
+  const RARITY_ORDER = ['common', 'rare', 'exotic', 'monster', 'fairy', 'goddess', 'eventHidden'];
 
   const FISH = [];
   // 每种鱼自己的介绍（照着素材图写的）；没有的才用调用处传入的那句
@@ -175,7 +176,79 @@
     { id: 'full_book',      name: '全图鉴',          cond: '图鉴 100%',                   points: 300 },
   ];
 
-  const data = { SEASONS, SEASON_CN, WEATHER_CN, WATER_CN, RARITY, RARITY_ORDER, FISH, ACHIEVEMENTS };
+  // ---- 节日限定场：独立一套可钓物，不算进上面 99 种图鉴和成就 ----
+  // 圣诞场：每年 12 月（UTC+8）开放；普通 40 · 稀有 20 · 奇珍异兽 5 · 限定隐藏 1
+  const EVENTS = { xmas: { id: 'xmas', cn: '圣诞', month: 11, when: '每年 12 月' } };
+  const EVENT_FISH = [
+    ['common', 'candycane', '拐杖糖鱼'],
+    ['common', 'gingerbread', '姜饼鱼'],
+    ['common', 'bell', '铃铛鱼'],
+    ['common', 'snowflake', '雪花鱼'],
+    ['common', 'mistletoe', '槲寄生鱼'],
+    ['common', 'pine', '松针鱼'],
+    ['common', 'ornament', '彩球鱼'],
+    ['common', 'stocking', '圣诞袜鱼'],
+    ['common', 'cocoa', '热可可鱼'],
+    ['common', 'snowman', '雪人鱼'],
+    ['common', 'holly', '冬青鱼'],
+    ['common', 'ribbon', '缎带鱼'],
+    ['common', 'topstar', '星星海星'],
+    ['common', 'giftcrab', '礼盒蟹'],
+    ['common', 'reindeershrimp', '驯鹿虾'],
+    ['common', 'cookieflounder', '饼干比目鱼'],
+    ['common', 'frosting', '糖霜鱼'],
+    ['common', 'lights', '彩灯鱼'],
+    ['common', 'penguin', '企鹅鱼'],
+    ['common', 'pudding', '布丁鱼'],
+    ['common', 'marshmallow', '棉花糖鱼'],
+    ['common', 'knitsquid', '毛线乌贼'],
+    ['common', 'scarfeel', '围巾鳗'],
+    ['common', 'snowglobejelly', '雪花球水母'],
+    ['common', 'candle', '蜡烛鱼'],
+    ['common', 'pineconepuffer', '松果河豚'],
+    ['common', 'mittencrab', '手套蟹'],
+    ['common', 'cranberry', '红莓鱼'],
+    ['common', 'cinnamon', '肉桂卷鱼'],
+    ['common', 'eggnog', '蛋酒鱼'],
+    ['common', 'wreath', '花环鱼'],
+    ['common', 'sleigh', '雪橇鱼'],
+    ['common', 'frostminnow', '霜花小鱼'],
+    ['common', 'chimney', '烟囱鱼'],
+    ['common', 'giftclam', '礼物蚌'],
+    ['common', 'tinsel', '金葱鱼'],
+    ['common', 'nutcracker', '胡桃夹鱼'],
+    ['common', 'candyshrimp', '糖果虾'],
+    ['common', 'snowball', '雪球鱼'],
+    ['common', 'gingerbreadstar', '星星饼干鱼'],
+    ['rare', 'aurora', '极光鱼'],
+    ['rare', 'starlight', '星光鱼'],
+    ['rare', 'crystalreindeer', '水晶驯鹿鱼'],
+    ['rare', 'gingerhousecrab', '姜饼屋蟹'],
+    ['rare', 'goldbellkoi', '金铃锦鲤'],
+    ['rare', 'frostangel', '霜天使鱼'],
+    ['rare', 'xmastree', '圣诞树鱼'],
+    ['rare', 'polarbear', '北极熊鱼'],
+    ['rare', 'snowowlray', '雪鸮鳐'],
+    ['rare', 'cocoaturtle', '可可龟'],
+    ['rare', 'musicboxjelly', '八音盒水母'],
+    ['rare', 'candyseahorse', '拐杖糖海马'],
+    ['rare', 'firework', '烟火鱼'],
+    ['rare', 'lightseel', '彩灯鳗'],
+    ['rare', 'cardinal', '红雀鱼'],
+    ['rare', 'icelobster', '冰晶龙虾'],
+    ['rare', 'snowbream', '雪晶鲷'],
+    ['rare', 'silverbellkoi', '银铃锦鲤'],
+    ['rare', 'mistletoebream', '槲寄生鲂'],
+    ['rare', 'velvetbetta', '丝绒斗鱼'],
+    ['exotic', 'reindeerqilin', '驯鹿麒麟'],
+    ['exotic', 'treeturtle', '圣诞树精龟'],
+    ['exotic', 'aurorawhale', '极光鲸'],
+    ['exotic', 'candynarwhal', '拐杖糖独角鲸'],
+    ['exotic', 'snowowlfish', '雪鸮鱼'],
+    ['eventHidden', 'santa', '圣诞老爷爷'],
+  ].map(([rarity, id, name]) => ({ id: 'xmas_' + id, name, rarity, water: 'xmas', season: null, weather: null, event: 'xmas', file: 'xmas_' + id, desc: '' }));
+
+  const data = { SEASONS, SEASON_CN, WEATHER_CN, WATER_CN, RARITY, RARITY_ORDER, FISH, ACHIEVEMENTS, EVENTS, EVENT_FISH };
   if (typeof module !== 'undefined' && module.exports) module.exports = data;
   else root.GameData = data;
 })(typeof window !== 'undefined' ? window : globalThis);

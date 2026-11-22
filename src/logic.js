@@ -33,8 +33,15 @@
   }
 
   // ---------- 抽鱼 ----------
+  // 节日限定场：12 月（UTC+8）才开放
+  function eventActive(id, now) {
+    const ev = D.EVENTS[id]; if (!ev) return false;
+    return new Date((now == null ? Date.now() : now) + 8 * HOUR).getUTCMonth() === ev.month;
+  }
+
   function eligible(rarity, scene) {
-    return D.FISH.filter(f => f.rarity === rarity &&
+    const pool = D.EVENTS[scene.water] ? D.EVENT_FISH.filter(f => f.event === scene.water) : D.FISH; // 限定场只钓限定可钓物
+    return pool.filter(f => f.rarity === rarity &&
       (f.water == null || f.water === scene.water) &&
       (f.season == null || f.season === scene.season) &&
       (f.weather == null || f.weather === scene.weather));
@@ -154,13 +161,13 @@
     const points = D.ACHIEVEMENTS.reduce((n, a) => n + (save.ach[a.id] ? a.points : 0), 0);
     const maxPoints = D.ACHIEVEMENTS.reduce((n, a) => n + a.points, 0);
     const found = D.FISH.filter(f => save.book[f.id]).length;
-    const byId = Object.fromEntries(D.FISH.map(f => [f.id, f]));
+    const byId = Object.fromEntries(D.FISH.concat(D.EVENT_FISH).map(f => [f.id, f]));
     const fishOnly = save.catches.filter(c => byId[c.id] && byId[c.id].rarity !== 'monster');
     const monsters = save.catches.filter(c => byId[c.id] && byId[c.id].rarity === 'monster');
     return { points, maxPoints, found, totalFish: D.FISH.length, top: fishOnly.slice(0, 10), topMonsters: monsters.slice(0, 5) };
   }
 
-  const api = { sceneAt, eligible, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
+  const api = { sceneAt, eventActive, eligible, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, KEY, RAIN_CHANCE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GameLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);
