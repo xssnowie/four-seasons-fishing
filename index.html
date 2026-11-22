@@ -3,9 +3,9 @@
 <head>
 <script>
 // 搬家：旧网址（GitHub Pages）把这台设备上的游客进度带到新网址；新网址收到后在 store.js 里合并导入
-// NEW_HOME 留 null = 不跳转（还没搬）
+// 2026-11-22 起正式网址是 Cloudflare Pages（同一个 GitHub 仓库自动部署）；只在 github.io 上跳转，不会循环
 (function () {
-  var NEW_HOME = null;
+  var NEW_HOME = 'https://four-seasons-fishing.pages.dev/';
   try {
     if (NEW_HOME && /\.github\.io$/.test(location.hostname)) {
       var o = {}, n = 0;
@@ -27,7 +27,7 @@
 <meta name="apple-mobile-web-app-title" content="四季钓场">
 <meta name="theme-color" content="#0d1430">
 <title>四季钓场</title>
-<link rel="stylesheet" href="assets/font/tangyuan/result.css?v=20261122222529">
+<link rel="stylesheet" href="assets/font/tangyuan/result.css?v=20261122224426">
 <style>
   /* 游戏字体：站酷快乐体（OFL 授权，见 assets/font/OFL.txt） */
   @font-face { font-family: 'ZCOOL KuaiLe'; src: url('assets/font/ZCOOLKuaiLe.woff2') format('woff2'); font-display: block; }
@@ -81,13 +81,13 @@
     });
   })();
 </script>
-<script src="vendor/phaser.min.js?v=20261122222529"></script>
-<script src="src/data.js?v=20261122222529"></script>
-<script src="src/logic.js?v=20261122222529"></script>
-<script src="src/firebase-config.js?v=20261122222529"></script>
-<script src="src/store.js?v=20261122222529"></script>
-<script src="src/account.js?v=20261122222529"></script>
-<script src="src/audio.js?v=20261122222529"></script>
-<script src="src/main.js?v=20261122222529"></script>
+<script src="vendor/phaser.min.js?v=20261122224426"></script>
+<script src="src/data.js?v=20261122224426"></script>
+<script src="src/logic.js?v=20261122224426"></script>
+<script src="src/firebase-config.js?v=20261122224426"></script>
+<script src="src/store.js?v=20261122224426"></script>
+<script src="src/account.js?v=20261122224426"></script>
+<script src="src/audio.js?v=20261122224426"></script>
+<script src="src/main.js?v=20261122224426"></script>
 </body>
 </html>
