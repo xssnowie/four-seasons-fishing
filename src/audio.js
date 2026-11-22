@@ -5,7 +5,7 @@
   try { muted = localStorage.getItem('fishing.muted') === '1'; } catch (e) { /* ignore */ }
 
   function ensure() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return ctx; }
+    if (ctx) { if (ctx.state === 'suspended' && !document.hidden) ctx.resume(); return ctx; }
     const AC = root.AudioContext || root.webkitAudioContext;
     if (!AC) return null;
     ctx = new AC();
@@ -14,6 +14,13 @@
     musicBus = ctx.createGain(); musicBus.gain.value = 0.22; musicBus.connect(master);
     return ctx;
   }
+
+  // 切到别的分页 / 切到后台 / 锁屏：整个音频暂停（音乐、雨声、音效都停），回来再接着播
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx) return;
+    if (document.hidden) ctx.suspend(); else ctx.resume();
+  });
+  root.addEventListener('pagehide', () => { if (ctx) ctx.suspend(); });
 
   let noiseBuf = null;
   function noise() {
