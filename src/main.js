@@ -1055,10 +1055,10 @@
       });
       o.add(detail);
       if (pages > 1) {
-        const px = P ? W / 2 : b.right - 200, py = P ? b.bottom - 110 : ty;
+        const px = P ? W / 2 : b.right - 330, py = P ? b.bottom - 110 : b.top + 56; // 横屏放标题那一行（关闭键左边），不跟页签抢位置
         o.add(TB(this, px, py, `${page + 1} / ${pages}`, 30, INK).setOrigin(0.5));
-        if (page > 0) o.add(button(this, px - 110, py, 90, 70, '‹', () => this.openBook(tab, page - 1), { size: 44 }));
-        if (page < pages - 1) o.add(button(this, px + 110, py, 90, 70, '›', () => this.openBook(tab, page + 1), { size: 44 }));
+        if (page > 0) o.add(button(this, px - 150, py, 130, 80, '‹', () => this.openBook(tab, page - 1), { size: 48 })); // 太窄时按钮底图会被压成一条线
+        if (page < pages - 1) o.add(button(this, px + 150, py, 130, 80, '›', () => this.openBook(tab, page + 1), { size: 48 }));
       }
     }
 
