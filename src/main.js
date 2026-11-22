@@ -89,6 +89,7 @@
   window.Store.onChange(S => { if (S.user && !okChar(S.save.char) && localChar()) setChar(localChar()); });
   // 节日限定场：12 月自动开放；?event=xmas 可以提前预览
   const xmasOn = () => Q.get('event') === 'xmas' || L.eventActive('xmas');
+  const XMAS_FIRST = Date.UTC(2026, 10, 30, 16); // 第一次开放：2026-12-01 00:00（UTC+8）
   let SKIN = null; // 当前场景的节日皮肤（在圣诞场 = 'xmas'）
   const pkey = pose => {
     const male = getChar() === 'male';
@@ -534,6 +535,7 @@
       }
       this.onBlur = () => this.release();
       this.game.events.on('blur', this.onBlur);
+      this.time.delayedCall(800, () => this.eventNotice());
       this.events.once('shutdown', () => this.game.events.off('blur', this.onBlur));
       this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tickClock() });
       this.tickClock();
@@ -670,6 +672,27 @@
       if (this.musicSeason !== song) { this.musicSeason = song; A.startMusic(song); }
       this.refreshHud();
       if (!first) this.flash(`天气变了：${sceneLabel(this.sc)}`);
+    }
+
+    // 圣诞场开放后第一次进游戏：弹通知（每台设备每年一次，点掉才算看过）
+    eventNotice() {
+      if (!xmasOn() || this.overlay || this.state !== 'idle') return;
+      const k = 'fishing.notice.xmas.' + new Date(Date.now() + 8 * 3600000).getUTCFullYear();
+      try { if (localStorage.getItem(k)) return; } catch (e) { return; }
+      const seen = () => { try { localStorage.setItem(k, String(Date.now())); } catch (e) { /* ignore */ } };
+      const P = this.Lx.P, W = this.Lx.W, pw = P ? 940 : 1100, ph = P ? 1000 : 820;
+      const o = this.openOverlay(pw, ph, 'ui_panel', seen);
+      this.overlayKind = 'notice';
+      const cy = this.Lx.oy, top = cy - ph / 2;
+      o.add(T(this, W / 2, top + 110, '圣诞限定钓场开放啦！', P ? 60 : 64, '#c8322f').setOrigin(0.5));
+      const pics = this.add.container(0, 0); o.add(pics);
+      const show = () => { if (this.overlay !== o) return; pics.removeAll(true); ['xmas_candycane', 'xmas_gingerbread', 'xmas_bell'].forEach((id, i) => pics.add(fit(this.add.image(W / 2 + (i - 1) * 250, top + 330, 'fish_' + id), 230, 200))); };
+      ensureEvent(this, 'xmas', show);
+      const total = D.EVENT_FISH.filter(f => f.event === 'xmas').length;
+      o.add(TB(this, W / 2, top + 470, `12 月 1 日 – 12 月 31 日限时开放\n${total} 种圣诞限定可钓物，还有神秘的限定隐藏等你来钓\n顶栏点「圣诞」就能进去`, P ? 34 : 36, INK, { align: 'center', lineSpacing: 16, wordWrap: { width: pw - 140, useAdvancedWrap: true } }).setOrigin(0.5, 0));
+      const by = cy + ph / 2 - (P ? 150 : 130);
+      o.add(button(this, W / 2 - 200, by, 340, 100, '稍后再说', () => this.closeOverlay(), { secondary: true, size: 36 }));
+      o.add(button(this, W / 2 + 200, by, 340, 100, '马上去钓', () => { this.closeOverlay(); this.switchWater('xmas'); }, { size: 36 }));
     }
 
     switchWater(w) {
@@ -1007,10 +1030,13 @@
       tab = tab || 'sea'; page = page || 0;
       const b = this.sheet(), o = b.o, P = this.Lx.P, W = this.Lx.W;
       // 节日限定页签：活动期间，或已经钓到过限定物才显示；不算进 99 种
-      const showX = xmasOn() || D.EVENT_FISH.some(f => this.save.book[f.id]);
+      const showX = xmasOn() || (Date.now() >= XMAS_FIRST && D.EVENT_FISH.some(f => this.save.book[f.id])); // 开放前不显示（之前预览钓到的也不显示）
       if (tab === 'xmas' && !showX) tab = 'sea';
       const xList = D.EVENT_FISH.filter(f => f.event === 'xmas');
-      if (tab === 'xmas') ensureEvent(this, 'xmas'); // 进圣诞页签时补下载限定图（第一次看可能是占位，重开就是正式图）
+      // 进圣诞页签时补下载限定图：还没下载完就先画，下载完自动重画一次（之前会显示成缺图的黑框）
+      if (tab === 'xmas' && D.EVENT_FISH.some(f => !this.textures.exists('fish_' + f.id))) {
+        const o0 = b.o; ensureEvent(this, 'xmas', () => { if (this.overlay === o0) this.openBook('xmas', page); });
+      }
       const found = tab === 'xmas' ? xList.filter(f => this.save.book[f.id]).length : D.FISH.filter(f => this.save.book[f.id]).length;
       o.add(T(this, b.left + 50, b.top + 30, tab === 'xmas' ? `圣诞限定  ${found} / ${xList.length}` : `图鉴  ${found} / ${D.FISH.length}`, 48, INK));
       const TABS = [['sea', '普通·海', f => f.rarity === 'common' && f.water === 'sea'], ['river', '普通·河', f => f.rarity === 'common' && f.water === 'river'],
