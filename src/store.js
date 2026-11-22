@@ -11,6 +11,17 @@
     try { const s = window.localStorage; s.getItem('x'); return s; } catch (e) { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: k => { delete m[k]; } }; }
   })();
 
+  // 从旧网址搬来的进度（见 index.html）：存档合并，其他设置（角色、静音等）这边没有才补上
+  if (window.__moved) {
+    Object.entries(window.__moved).forEach(([k, v]) => {
+      try {
+        if (k === GUEST) { const cur = L.load(ls, k), inc = Object.assign(L.emptySave(), JSON.parse(v)); L.persist(ls, L.isEmpty(cur) ? inc : L.merge(cur, inc), k); }
+        else if (ls.getItem(k) == null) ls.setItem(k, v);
+      } catch (e) { console.warn('[store] 搬家导入失败', k); }
+    });
+    window.__moved = null;
+  }
+
   const S = {
     save: L.load(ls, GUEST),
     user: null,               // { uid, name }
