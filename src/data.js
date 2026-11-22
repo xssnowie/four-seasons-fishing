@@ -181,8 +181,8 @@
   // table：限定场的出现率（%）。base = 普通场的可钓物（海 + 河，跟当前季节、天气），event = 限定可钓物；合计 100
   // 小隐藏、大隐藏不在限定场出现；抛得远近照样影响（d=0.5 时就是这里的值）
   const EVENTS = { xmas: { id: 'xmas', cn: '圣诞', month: 11, when: '每年 12 月', table: [
-    ['common', 'base', 30], ['common', 'event', 38.999],
-    ['rare', 'base', 10], ['rare', 'event', 15],
+    ['common', 'base', 10], ['common', 'event', 53.999],
+    ['rare', 'base', 10], ['rare', 'event', 20],
     ['exotic', 'base', 1], ['exotic', 'event', 4.5],
     ['monster', 'base', 0.5],
     ['eventHidden', 'event', 0.001],
