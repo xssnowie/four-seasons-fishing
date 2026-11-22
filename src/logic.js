@@ -3,32 +3,21 @@
   const D = (typeof module !== 'undefined' && module.exports) ? require('./data.js') : root.GameData;
 
   // ---------- 场景轮换（真实时间，所有人同一时刻同一场景）----------
-  const WEEK = 7 * 24 * 3600 * 1000;
   const HOUR = 3600 * 1000;
-  const EPOCH = Date.UTC(2026, 0, 4, 16, 0, 0); // 2026-01-05 周一 00:00（UTC+8）作为「春季第一周」起点
-  const RAIN_CHANCE = 0.35;
-
-  function hash32(n) { // 整数 → 0..1 的稳定伪随机
-    n = (n ^ 0x9e3779b9) >>> 0;
-    n = Math.imul(n ^ (n >>> 16), 0x85ebca6b) >>> 0;
-    n = Math.imul(n ^ (n >>> 13), 0xc2b2ae35) >>> 0;
-    n = (n ^ (n >>> 16)) >>> 0;
-    return n / 4294967296;
-  }
+  const EPOCH = Date.UTC(2026, 0, 2, 16, 0, 0); // 2026-01-03 00:00（UTC+8）作为起点：春季第一段、晴天开始（这样改成 2 天一季时，当天的夏季接着原来的时间表在 11/23 换秋，不会跳季）
+  const SEASON_LEN = 2 * 24 * HOUR;             // 每 2 天换一季，春 → 夏 → 秋 → 冬 轮流
+  const SUNNY_LEN = 4 * HOUR, RAINY_LEN = 2 * HOUR, WX_CYCLE = SUNNY_LEN + RAINY_LEN; // 晴 4 小时 → 雨 2 小时，固定轮流
+  const RAIN_CHANCE = RAINY_LEN / WX_CYCLE;     // 雨天占比（1/3），给模拟脚本核对用
 
   function sceneAt(now) {
-    const week = Math.floor((now - EPOCH) / WEEK);
-    const season = D.SEASONS[((week % 4) + 4) % 4];
-    const hour = Math.floor(now / HOUR);
-    const wx = h => (hash32(h) < RAIN_CHANCE ? 'rainy' : 'sunny');
-    const weather = wx(hour);
-    // 天气每小时抽一次，可能连着几小时都一样：倒计时指向「真正会变天」的那个整点（最多往后看 3 天）
-    let next = hour + 1;
-    while (next < hour + 72 && wx(next) === weather) next++;
+    const k = Math.floor((now - EPOCH) / SEASON_LEN);
+    const season = D.SEASONS[((k % 4) + 4) % 4];
+    const t = (((now - EPOCH) % WX_CYCLE) + WX_CYCLE) % WX_CYCLE; // 在 6 小时周期里的位置
+    const sunny = t < SUNNY_LEN;
     return {
-      season, weather,
-      nextWeatherIn: next * HOUR - now,
-      nextSeasonIn: EPOCH + (week + 1) * WEEK - now,
+      season, weather: sunny ? 'sunny' : 'rainy',
+      nextWeatherIn: (sunny ? SUNNY_LEN : WX_CYCLE) - t,
+      nextSeasonIn: EPOCH + (k + 1) * SEASON_LEN - now,
     };
   }
 

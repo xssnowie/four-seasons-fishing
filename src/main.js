@@ -553,7 +553,14 @@
       const Lx = this.Lx, iw = Lx.P ? 1080 : 1920, ih = Lx.P ? 1920 : 1080, s = Math.max(Lx.W / iw, Lx.H / ih), [fx, fy] = ICE[Lx.P ? 'portrait' : 'landscape'];
       return { x: fx * iw * s, y: Lx.H - (1 - fy) * ih * s };
     }
-    floatTarget(d) { return this.winterRiver() ? this.iceHole() : this.Lx.far(d); }
+    floatTarget(d) { return this.winterRiver() ? this.iceHole() : this.far(d); }
+    // 浮标落点。圣诞场横屏的码头往右伸得更远，按圣诞背景（1920×1080，cover + 左下对齐）的水面重算，免得近投落在码头上
+    far(d) {
+      const Lx = this.Lx;
+      if (!D.EVENTS[this.water] || Lx.P) return Lx.far(d);
+      const s = Math.max(Lx.W / 1920, Lx.H / 1080);
+      return { x: Math.min(Lx.W - 120, (0.56 + 0.30 * d) * 1920 * s), y: Lx.H - (1 - (0.74 - 0.16 * d)) * 1080 * s };
+    }
 
     // ---------- HUD ----------
     buildHud() {
@@ -576,13 +583,18 @@
         mk(x0 + step * i++, y, bw, 84, '榜单', () => this.openRank());
         this.muteBtn = this.soundButton(W - Math.max(70, orn + 40), 66, 96, mk);
       } else {
-        const ex = xmasOn(), wb = ex ? 150 : 170, ws = ex ? 165 : 190, wx = ex ? 720 : 760;
-        this.waterBtns = { sea: mk(wx, 56, wb, 80, '海边', () => this.switchWater('sea'), true), river: mk(wx + ws, 56, wb, 80, '河边', () => this.switchWater('river'), true) };
-        if (ex) this.waterBtns.xmas = mk(wx + ws * 2, 56, wb, 80, '圣诞', () => this.switchWater('xmas'), true);
-        const r = Math.max(0, orn - 40); // 给右边救生圈让位
-        mk(W - 660 - r, 56, 170, 80, '图鉴', () => this.openBook());
-        mk(W - 470 - r, 56, 170, 80, '成就', () => this.openAch());
-        mk(W - 280 - r, 56, 170, 80, '成就榜', () => this.openRank());
+        const ex = xmasOn(), r = Math.max(0, orn - 40); // r：给右边救生圈让位
+        const waters = [['sea', '海边'], ['river', '河边']].concat(ex ? [['xmas', '圣诞']] : []);
+        const tools = [['图鉴', () => this.openBook()], ['成就', () => this.openAch()], ['成就榜', () => this.openRank()]];
+        let wb = ex ? 150 : 170, ws = ex ? 165 : 190, wx = ex ? 720 : 760, tb = 170, tx = W - 660 - r, ts = 190;
+        if (wx + ws * (waters.length - 1) + wb / 2 + 20 > tx - tb / 2) { // 窄横屏（如 4:3 平板）放不下：整排按钮在标题右边平均排开
+          const left = 570, right = W - 150 - r, step = (right - left) / (waters.length + tools.length);
+          wb = tb = Math.min(170, step + 20); // 底图两端各有约 30px 透明边，稍微叠一点看不出来；太窄底图会被压成细条
+          ws = ts = step; wx = left + step / 2; tx = wx + step * waters.length;
+        }
+        this.waterBtns = {};
+        waters.forEach(([id, label], i) => { this.waterBtns[id] = mk(wx + ws * i, 56, wb, 80, label, () => this.switchWater(id), true); });
+        tools.forEach(([label, fn], i) => mk(tx + ts * i, 56, tb, 80, label, fn));
         this.muteBtn = this.soundButton(W - 90 - r, 56, 88, mk);
       }
       this.drawMute();
@@ -621,7 +633,8 @@
 
     tickClock() {
       const s = currentScene(this.water);
-      this.clockText.setText(`下次变天 ${mmss(s.nextWeatherIn)} · 换季还有 ${Math.ceil(s.nextSeasonIn / 86400000)} 天`);
+      const sh = Math.ceil(s.nextSeasonIn / 3600000), sd = Math.floor(sh / 24); // 2 天一季，精确到小时
+      this.clockText.setText(`下次变天 ${mmss(s.nextWeatherIn)} · 换季还有 ${sd ? sd + ' 天 ' : ''}${sh % 24 || !sd ? (sh % 24) + ' 小时' : ''}`.trim());
       if (s.season !== this.sc.season || s.weather !== this.sc.weather) { this.sc = s; this.applyScene(false); }
       if (D.EVENTS[this.water] && !xmasOn() && this.state === 'idle') { this.switchWater('sea'); this.flash('圣诞限定场已经结束，明年 12 月见～'); }
     }
@@ -808,7 +821,7 @@
       r.progress = Math.max(0, r.progress + (inZone ? dt / r.reelTime : -0.12 * dt));
       r.grace -= dt;
       // 收线时浮标往近处的水面拉（近投落点，所有背景里都确认是水），不往竿尖拉，否则会被拖到码头 / 岸上
-      const end = this.winterRiver() ? this.floatHome : this.Lx.far(0);
+      const end = this.winterRiver() ? this.floatHome : this.far(0);
       const tx = this.floatHome.x + (end.x - this.floatHome.x) * r.progress;
       const ty = this.floatHome.y + (end.y - this.floatHome.y) * r.progress;
       this.float.x += (tx - this.float.x) * Math.min(1, dt * 3);
