@@ -151,6 +151,8 @@
   add('monster', 'seaserpent', '巨型海蛇', 'sea', 'summer', 'rainy', '盘起来有一座岛那么大。');
   add('monster', 'lavabeast', '熔岩海兽', 'sea', 'summer', 'sunny', '火山岩背壳下流着岩浆，海水都被煮沸了。');
   add('monster', 'kraken', '海怪', 'sea', 'autumn', 'rainy', '无数触手的深海霸主，秋雨夜最危险。');
+  // 等批次 14 素材到了再打开（同时把怪兽数改 7、总数改 100）
+  // add('monster', 'shielddragon', '遮麟龙', 'sea', 'autumn', 'sunny', '全身披着盾形大鳞甲的海龙，一受惊就把鳞甲合拢，像一座会游泳的堡垒。');
   add('monster', 'icetitan', '冰原巨兽', 'sea', 'winter', 'sunny', '冰川獠牙、霜甲加身的远古巨兽。');
   add('monster', 'deepabyss', '深海巨兆', 'sea', 'winter', 'rainy', '背负珊瑚礁的深海巨兽，灯笼一亮，海面就要变天。');
 

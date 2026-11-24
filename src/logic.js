@@ -9,6 +9,12 @@
   const SUNNY_LEN = 4 * HOUR, RAINY_LEN = 2 * HOUR, WX_CYCLE = SUNNY_LEN + RAINY_LEN; // 晴 4 小时 → 雨 2 小时，固定轮流
   const RAIN_CHANCE = RAINY_LEN / WX_CYCLE;     // 雨天占比（1/3），给模拟脚本核对用
 
+  // 校准过的「现在」：进游戏时向网站取一次标准时间，算出和手机时钟的差；调手机时间就换不了季节、天气
+  // 取不到（离线）时差为 0，照旧用手机时间
+  let clockOff = 0;
+  const now = () => Date.now() + clockOff;
+  const setClockOffset = ms => { clockOff = ms; };
+
   function sceneAt(now) {
     const k = Math.floor((now - EPOCH) / SEASON_LEN);
     const season = D.SEASONS[((k % 4) + 4) % 4];
@@ -25,7 +31,7 @@
   // 节日限定场：12 月（UTC+8）才开放
   function eventActive(id, now) {
     const ev = D.EVENTS[id]; if (!ev) return false;
-    return new Date((now == null ? Date.now() : now) + 8 * HOUR).getUTCMonth() === ev.month;
+    return new Date((now == null ? api.now() : now) + 8 * HOUR).getUTCMonth() === ev.month;
   }
 
   // 某一类可钓物在当前场景的鱼池。限定场里 src='base' 是普通场的鱼（海、河都算，跟季节天气），'event' 是限定物
@@ -107,7 +113,7 @@
     out.catches = [...a.catches, ...b.catches].filter(c => { const k = c.id + '|' + c.w + '|' + c.t; if (seen.has(k)) return false; seen.add(k); return true; })
       .sort((p, q) => q.w - p.w).slice(0, 200);
     const pick = (a.charAt || 0) >= (b.charAt || 0) ? a : b; out.char = pick.char || a.char || b.char || null; out.charAt = Math.max(a.charAt || 0, b.charAt || 0);
-    checkAchievements(out, Date.now()); // 合并后可能凑齐新成就（例如两边各有一半图鉴）
+    checkAchievements(out, api.now()); // 合并后可能凑齐新成就（例如两边各有一半图鉴）
     return out;
   }
   const isEmpty = s => !s || !s.total;
@@ -189,7 +195,7 @@
     return e;
   }
 
-  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, rankEntry, RANK_BOARDS, KEY, RAIN_CHANCE };
+  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, rankEntry, RANK_BOARDS, KEY, RAIN_CHANCE, now, setClockOffset };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GameLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

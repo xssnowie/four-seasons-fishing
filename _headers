@@ -1,0 +1,5 @@
+# Cloudflare Pages 响应头：游戏向 time.txt 取标准时间（读响应头 Date），APK 是跨域请求，要放行并公开 Date
+/time.txt
+  Access-Control-Allow-Origin: *
+  Access-Control-Expose-Headers: Date
+  Cache-Control: no-store

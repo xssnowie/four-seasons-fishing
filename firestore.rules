@@ -17,6 +17,7 @@ service cloud.firestore {
       return d[b] is int && d[b + 'T'] is int && d[b + 'K'] is int
         && d[b] >= 0 && d[b] <= mx
         && d[b + 'T'] > 0 && d[b + 'T'] < 10000000000
+        && d[b + 'T'] <= request.time.toMillis() / 1000 + 600 // 达成时间不能在未来（调快手机时间钓的成绩上不了榜），留 10 分钟误差
         && d[b + 'K'] == d[b] * 10000000000 + 10000000000 - d[b + 'T'];
     }
     match /ranks/{uid} {

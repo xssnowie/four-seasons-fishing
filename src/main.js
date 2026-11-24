@@ -9,8 +9,23 @@
   const TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   const MIN_FONT = TOUCH ? 30 : 22; // 手机上画布缩得厉害，字不能太小
 
-  // URL 调试参数：?season=winter&weather=rainy&force=deepabyss
-  const Q = new URLSearchParams(location.search);
+  // URL 调试参数：?season=winter&weather=rainy&force=deepabyss&event=xmas
+  // 只在本机测试服务器（127.0.0.1）上生效；正式网址和 APK 里一律无效，免得被拿来选季节、指定钓到哪条鱼
+  const DEV = location.hostname === '127.0.0.1';
+  const Q = new URLSearchParams(DEV ? location.search : '');
+
+  // 标准时间：向网站取响应头里的 Date，算出和手机时钟的差（季节、天气、钓到的时间都按这个算）
+  // APK 跨域读取靠 _headers 里的 Access-Control-Expose-Headers: Date；取不到就隔 1 分钟再试，期间照旧用手机时间
+  const TIME_URL = DEV ? 'time.txt' : 'https://four-seasons-fishing.pages.dev/time.txt';
+  (function syncClock() {
+    const t0 = Date.now();
+    fetch(TIME_URL + '?t=' + t0, { cache: 'no-store' }).then(r => {
+      const t1 = Date.now(), srv = Date.parse(r.headers.get('Date') || '');
+      if (!srv) throw new Error('no Date');
+      const off = srv + 500 - (t0 + t1) / 2; // Date 只到秒，补半秒
+      L.setClockOffset(Math.abs(off) > 3000 ? Math.round(off) : 0); // 差几秒不管，免得来回跳
+    }).catch(() => setTimeout(syncClock, 60000));
+  })();
 
   // ---------------- 画布尺寸：短边固定 1080，长边跟随屏幕比例 ----------------
   function host() { const el = document.getElementById('game'); return { w: el.clientWidth || innerWidth, h: el.clientHeight || innerHeight }; }
@@ -397,7 +412,7 @@
   }
 
   function currentScene(water) {
-    const s = L.sceneAt(Date.now());
+    const s = L.sceneAt(L.now());
     if (D.SEASONS.includes(Q.get('season'))) s.season = Q.get('season');
     if (['sunny', 'rainy'].includes(Q.get('weather'))) s.weather = Q.get('weather');
     s.water = water;
@@ -720,7 +735,7 @@
     // 圣诞场开放后第一次进游戏：弹通知（每台设备每年一次，点掉才算看过）
     eventNotice() {
       if (!xmasOn() || this.overlay || this.state !== 'idle') return;
-      const k = 'fishing.notice.xmas.' + new Date(Date.now() + 8 * 3600000).getUTCFullYear();
+      const k = 'fishing.notice.xmas.' + new Date(L.now() + 8 * 3600000).getUTCFullYear();
       try { if (localStorage.getItem(k)) return; } catch (e) { return; }
       const seen = () => { try { localStorage.setItem(k, String(Date.now())); } catch (e) { /* ignore */ } };
       const P = this.Lx.P, W = this.Lx.W, pw = P ? 940 : 1100, ph = P ? 1000 : 820;
@@ -963,7 +978,7 @@
       this.float.setVisible(false);
       this.player.setTexture(pkey('celebrate'));
       const { fish, weight } = this.hook;
-      const res = L.recordCatch(this.save, fish, weight, this.sc, Date.now());
+      const res = L.recordCatch(this.save, fish, weight, this.sc, L.now());
       window.Store.commit();
       const show = () => this.showResult(fish, weight, res);
       if (fish.rarity === 'fairy' || fish.rarity === 'goddess' || fish.rarity === 'eventHidden') return this.fairyRise(show, fish);
@@ -1073,7 +1088,7 @@
       tab = tab || 'sea'; page = page || 0;
       const b = this.sheet(), o = b.o, P = this.Lx.P, W = this.Lx.W;
       // 节日限定页签：活动期间，或已经钓到过限定物才显示；不算进 99 种
-      const showX = xmasOn() || (Date.now() >= XMAS_FIRST && D.EVENT_FISH.some(f => this.save.book[f.id])); // 开放前不显示（之前预览钓到的也不显示）
+      const showX = xmasOn() || (L.now() >= XMAS_FIRST && D.EVENT_FISH.some(f => this.save.book[f.id])); // 开放前不显示（之前预览钓到的也不显示）
       if (tab === 'xmas' && !showX) tab = 'sea';
       const xList = D.EVENT_FISH.filter(f => f.event === 'xmas');
       // 进圣诞页签时补下载限定图：还没下载完就先画，下载完自动重画一次（之前会显示成缺图的黑框）
