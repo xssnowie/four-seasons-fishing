@@ -749,7 +749,7 @@
       const o = this.openOverlay(pw, ph, 'ui_panel', seen);
       this.overlayKind = 'notice';
       const cy = this.Lx.oy, top = cy - ph / 2;
-      o.add(T(this, W / 2, top + 110, E.notice[0], P ? 60 : 64, E.color).setOrigin(0.5));
+      o.add(T(this, W / 2, top + 110, typeof E.notice[0] === 'function' ? E.notice[0](L.now()) : E.notice[0], P ? 60 : 64, E.color).setOrigin(0.5));
       const pics = this.add.container(0, 0); o.add(pics);
       const show = () => { if (this.overlay !== o) return; pics.removeAll(true); fishes.slice(0, 3).forEach((f, i) => pics.add(fit(this.add.image(W / 2 + (i - 1) * 250, top + 330, 'fish_' + f.id), 230, 200))); };
       ensureEvent(this, id, show);
