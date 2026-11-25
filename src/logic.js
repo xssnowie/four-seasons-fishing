@@ -154,20 +154,33 @@
     monster_slayer: s => D.FISH.some(f => f.rarity === 'monster' && s.book[f.id]),
     fairy: s => D.FISH.some(f => f.rarity === 'fairy' && s.book[f.id]),
     goddess: s => !!s.book.goddess,
-    full_book: s => D.FISH.every(f => s.book[f.id]),
+    thanks_any: s => evFish('thanks').some(f => evGot(s, f)),
+    thanks_all: s => evFish('thanks').every(f => evGot(s, f)),
+    xmas_any: s => evFish('xmas').some(f => evGot(s, f)),
+    xmas_all: s => evFish('xmas').filter(f => f.rarity !== 'eventHidden').every(f => evGot(s, f)),
+    xmas_santa: s => evFish('xmas').filter(f => f.rarity === 'eventHidden').every(f => evGot(s, f)),
   };
+  // 节日限定物：只算节日第一次开放之后钓到的（开放前预览钓到的不算图鉴排名、不算成就）
+  const evFish = id => D.EVENT_FISH.filter(f => f.event === id);
+  const evGot = (s, f) => !!s.book[f.id] && s.book[f.id].first >= D.EVENTS[f.event].first;
+  // 节日成就 / 节日限定物在节日第一次开放后才出现
+  const achVisible = (a, now) => !a.event || (now == null ? api.now() : now) >= D.EVENTS[a.event].first;
+  const evOpened = (f, now) => (now == null ? api.now() : now) >= D.EVENTS[f.event].first;
 
   function checkAchievements(save, now) {
     const got = [];
     D.ACHIEVEMENTS.forEach(a => {
-      if (!save.ach[a.id] && RULES[a.id](save)) { save.ach[a.id] = now; got.push(a); }
+      if (!save.ach[a.id] && achVisible(a, now) && RULES[a.id](save)) { save.ach[a.id] = now; got.push(a); }
     });
     return got;
   }
+  // 图鉴排名：普通 99 种 + 已开放过的节日限定物
+  const bookFish = now => D.FISH.concat(D.EVENT_FISH.filter(f => evOpened(f, now)));
+  const bookGot = save => D.FISH.filter(f => save.book[f.id]).concat(D.EVENT_FISH.filter(f => evGot(save, f)));
 
   function stats(save) {
     const points = D.ACHIEVEMENTS.reduce((n, a) => n + (save.ach[a.id] ? a.points : 0), 0);
-    const maxPoints = D.ACHIEVEMENTS.reduce((n, a) => n + a.points, 0);
+    const maxPoints = D.ACHIEVEMENTS.filter(a => achVisible(a)).reduce((n, a) => n + a.points, 0);
     const found = D.FISH.filter(f => save.book[f.id]).length;
     const byId = Object.fromEntries(D.FISH.concat(D.EVENT_FISH).map(f => [f.id, f]));
     const fishOnly = save.catches.filter(c => byId[c.id] && byId[c.id].rarity !== 'monster');
@@ -184,7 +197,7 @@
     const sec = t => Math.max(1, Math.min(RANK_E - 1, Math.floor((t || 0) / 1000)));
     const byId = Object.fromEntries(D.FISH.concat(D.EVENT_FISH).map(f => [f.id, f]));
     const done = D.ACHIEVEMENTS.filter(a => save.ach[a.id]);
-    const got = D.FISH.filter(f => save.book[f.id]);
+    const got = bookGot(save); // 含节日限定（只算开放后钓到的）
     const fish = save.catches.find(c => byId[c.id] && byId[c.id].rarity !== 'monster');
     const mon = save.catches.find(c => byId[c.id] && byId[c.id].rarity === 'monster');
     const e = {
@@ -197,7 +210,7 @@
     return e;
   }
 
-  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, rankEntry, RANK_BOARDS, KEY, RAIN_CHANCE, now, setClockOffset };
+  const api = { sceneAt, eventActive, eligible, rateTable, rarityWeights, pickFish, emptySave, load, persist, merge, isEmpty, recordCatch, checkAchievements, stats, rankEntry, RANK_BOARDS, KEY, RAIN_CHANCE, now, setClockOffset, achVisible, bookFish };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GameLogic = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -175,7 +175,13 @@
     { id: 'monster_slayer', name: '屠龙勇士',        cond: '钓起任一怪兽',                points: 80 },
     { id: 'fairy',          name: '我钓到了小仙女',  cond: '钓起任一位四季小仙女',        points: 60 },
     { id: 'goddess',        name: '女神的眷顾',      cond: '钓起大隐藏水之女神',          points: 150 },
-    { id: 'full_book',      name: '全图鉴',          cond: '图鉴 100%',                   points: 300 },
+    // 「全图鉴」已移除（节日限定物以后会越来越多，全图鉴不再有意义）
+    // 节日限定成就：event = 所属节日；节日第一次开放前不显示、也不会达成（之前预览钓到的不算）
+    { id: 'thanks_any',     name: '感恩的心',        cond: '钓到任一感恩节限定物',        points: 30,  event: 'thanks' },
+    { id: 'thanks_all',     name: '丰收满仓',        cond: '集齐全部感恩节限定物',        points: 150, event: 'thanks' },
+    { id: 'xmas_any',       name: '圣诞快乐',        cond: '钓到任一圣诞限定物',          points: 30,  event: 'xmas' },
+    { id: 'xmas_all',       name: '圣诞收藏家',      cond: '集齐圣诞限定（不含隐藏）',    points: 200, event: 'xmas' },
+    { id: 'xmas_santa',     name: '圣诞老人来了',    cond: '钓起限定隐藏圣诞老爷爷',      points: 150, event: 'xmas' },
   ];
 
   // ---- 节日限定场：独立一套可钓物，不算进上面 99 种图鉴和成就 ----

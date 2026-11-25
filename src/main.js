@@ -590,6 +590,8 @@
       this.onBlur = () => this.release();
       this.game.events.on('blur', this.onBlur);
       this.time.delayedCall(800, () => this.eventNotice());
+      // 新加的成就（例如节日成就）：之前已经满足条件的玩家，进游戏时补发
+      this.time.delayedCall(1500, () => { const got = L.checkAchievements(this.save, L.now()); if (got.length) { window.Store.commit(); got.forEach(x => this.toast(x)); } });
       this.events.once('shutdown', () => this.game.events.off('blur', this.onBlur));
       this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tickClock() });
       this.tickClock();
@@ -1172,21 +1174,24 @@
       if (this.busy()) return;
       const b = this.sheet(), o = b.o, P = this.Lx.P;
       const st = L.stats(this.save);
-      const doneN = D.ACHIEVEMENTS.filter(a => this.save.ach[a.id]).length;
-      o.add(T(this, b.left + 50, b.top + 30, `成就  ${doneN} / ${D.ACHIEVEMENTS.length}`, 48, INK));
+      const ACH = D.ACHIEVEMENTS.filter(a => L.achVisible(a)); // 节日成就在节日第一次开放后才显示
+      const doneN = ACH.filter(a => this.save.ach[a.id]).length;
+      o.add(T(this, b.left + 50, b.top + 30, `成就  ${doneN} / ${ACH.length}`, 48, INK));
       o.add(TB(this, b.left + 50, b.top + 95, `成就点数 ${st.points} / ${st.maxPoints}`, 32, '#7a5a3a'));
-      const cols = P ? 1 : 2, startY = b.top + 230, step = Math.min(170, (b.bottom - 60 - startY) / Math.ceil(D.ACHIEVEMENTS.length / cols));
-      const colW = (b.w - 100) / cols;
-      D.ACHIEVEMENTS.forEach((a, i) => {
-        const x = b.left + 110 + (i % cols) * colW, y = startY + Math.floor(i / cols) * step;
+      // 成就变多了：每行固定高度，放不下就上下滑动
+      const cols = P ? 1 : 2, top = b.top + 150, view = b.bottom - 40 - top, step = 150, rowsN = Math.ceil(ACH.length / cols);
+      const colW = (b.w - 100) / cols, box = this.add.container(0, 0); o.add(box);
+      ACH.forEach((a, i) => {
+        const x = b.left + 110 + (i % cols) * colW, y = top + 80 + Math.floor(i / cols) * step;
         const done = this.save.ach[a.id];
         const bs = Math.min(120, step - 10), badge = this.add.image(x, y, 'badge_' + a.id).setDisplaySize(bs, bs);
         if (!done) badge.setTint(0x777777).setAlpha(0.6);
-        o.add(badge);
-        o.add(T(this, x + 85, y - 54, a.name, 36, done ? INK : '#8a8a8a'));
-        o.add(TB(this, x + 85, y - 8, a.cond, 26, '#7a5a3a'));
-        o.add(TB(this, x + 85, y + 28, done ? `已达成 ${new Date(done).toLocaleDateString('zh-CN')}  +${a.points}` : `未达成 · ${a.points} 点`, 24, done ? '#2e8b3e' : '#9a9a9a'));
+        box.add(badge);
+        box.add(T(this, x + 85, y - 54, a.name, 36, done ? INK : '#8a8a8a'));
+        box.add(TB(this, x + 85, y - 8, a.cond, 26, '#7a5a3a'));
+        box.add(TB(this, x + 85, y + 28, done ? `已达成 ${new Date(done).toLocaleDateString('zh-CN')}  +${a.points}` : `未达成 · ${a.points} 点`, 24, done ? '#2e8b3e' : '#9a9a9a'));
       });
+      this.scrollable(o, b, top, view, box, rowsN * step + 20);
     }
 
     // 成就榜：「我的」= 自己的成绩（本机）；其余 4 个页签 = 全服前 50 名（Firestore ranks），同分先达成的排前面
@@ -1210,14 +1215,15 @@
       if (tab === 'mine') return this.rankMine(b, o, st, byId, y0);
 
       // —— 全服榜 ——
-      const val = { pts: r => `${r.v} 点`, book: r => `${r.v} / ${D.FISH.length}`, fish: r => fmtW(r.v / 100), mon: r => fmtW(r.v / 100) }[tab];
+      const bookN = L.bookFish().length;
+      const val = { pts: r => `${r.v} 点`, book: r => `${r.v} / ${bookN}`, fish: r => fmtW(r.v / 100), mon: r => fmtW(r.v / 100) }[tab];
       const sub = r => (tab === 'fish' || tab === 'mon') && byId[r.id] ? byId[r.id].name : '';
       const me = L.rankEntry(this.save), myV = me[tab];
       const bar = { x: b.left + 40, y: y0 + 16, w: b.w - 80, h: 96 };
       const g = this.add.graphics(); g.fillStyle(0xfff3c4, 1).fillRoundedRect(bar.x, bar.y, bar.w, bar.h, 22); g.lineStyle(4, 0xd9a740, 1).strokeRoundedRect(bar.x, bar.y, bar.w, bar.h, 22); o.add(g);
       const myRank = TB(this, bar.x + 30, bar.y + bar.h / 2, '', 32, INK).setOrigin(0, 0.5); o.add(myRank);
       const myVal = TB(this, bar.x + bar.w - 30, bar.y + bar.h / 2, myV > 0 ? val({ v: myV }) : '', 32, INK).setOrigin(1, 0.5); o.add(myVal);
-      const tip = { pts: '达成成就得点数', book: '已解锁鱼种（不含节日限定）', fish: '单条最重的鱼，不含怪兽', mon: '单条最重的怪兽' }[tab];
+      const tip = { pts: '达成成就得点数', book: '已解锁鱼种（含节日限定）', fish: '单条最重的鱼，不含怪兽', mon: '单条最重的怪兽' }[tab];
       myRank.setText(!SS.user ? '登录后才能上榜' : SS.isTester() ? '测试账号：不参加排行榜' : myV > 0 ? '我的名次：查询中…' : `还没有成绩（${tip}）`);
       const top = bar.y + bar.h + 24, bottom = b.bottom - (P ? 40 : 60);
       o.add(TB(this, W / 2, top + 4, `全服前 50 名 · ${tip} · 同分时先达成的排前面`, 24, '#9a7a5a').setOrigin(0.5, 0));
