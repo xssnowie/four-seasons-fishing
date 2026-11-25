@@ -84,13 +84,19 @@
     if (!ensure()) return;
     if (on && !rainNode) {
       const s = ctx.createBufferSource(); s.buffer = noise(); s.loop = true;
-      const fl = ctx.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 1400; fl.Q.value = 0.4;
-      const g = ctx.createGain(); g.gain.value = 0.0001; g.gain.exponentialRampToValueAtTime(0.09, ctx.currentTime + 1.5);
-      s.connect(fl); fl.connect(g); g.connect(master); s.start();
-      rainNode = { s, g };
+      // 以前是 1400Hz 带通、音量 0.09：沙沙声正好压在旋律的频段，盖过背景音乐
+      // 现在去掉刺耳的高频、只留低沉的雨幕，音量降到约 1/3，再加一点慢慢起伏，听起来更像远处的雨
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 180;
+      const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 900; fl.Q.value = 0.3;
+      const g = ctx.createGain(); g.gain.value = 0.0001; g.gain.exponentialRampToValueAtTime(0.03, ctx.currentTime + 2);
+      const lfo = ctx.createOscillator(), depth = ctx.createGain(); lfo.frequency.value = 0.13; depth.gain.value = 0.008;
+      lfo.connect(depth); depth.connect(g.gain); lfo.start();
+      s.connect(hp); hp.connect(fl); fl.connect(g); g.connect(master); s.start();
+      rainNode = { s, g, lfo };
     } else if (!on && rainNode) {
-      const { s, g } = rainNode; rainNode = null;
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1); s.stop(ctx.currentTime + 1.1);
+      const { s, g, lfo } = rainNode; rainNode = null;
+      g.gain.cancelScheduledValues(ctx.currentTime); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1); s.stop(ctx.currentTime + 1.1); lfo.stop(ctx.currentTime + 1.1);
     }
   }
 

@@ -3,7 +3,7 @@
   const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
   const SEASON_CN = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' };
   const WEATHER_CN = { sunny: '晴', rainy: '雨' };
-  const WATER_CN = { sea: '海', river: '河', xmas: '圣诞场' };
+  const WATER_CN = { sea: '海', river: '河', xmas: '圣诞场', thanks: '感恩节场' };
 
   // 稀有度配置。prob = 基础概率（%），抛竿距离居中时的值；safe = 张力安全区宽度；
   // strength = 鱼的挣扎力度；reelTime = 安全区内需要收线的秒数；weight = 重量区间 kg
@@ -182,13 +182,29 @@
   // 圣诞场：每年 12 月（UTC+8）开放；普通 40 · 稀有 20 · 奇珍异兽 5 · 限定隐藏 1
   // table：限定场的出现率（%）。base = 普通场的可钓物（海 + 河，跟当前季节、天气），event = 限定可钓物；合计 100
   // 小隐藏、大隐藏不在限定场出现；抛得远近照样影响（d=0.5 时就是这里的值）
-  const EVENTS = { xmas: { id: 'xmas', cn: '圣诞', month: 11, when: '每年 12 月', table: [
-    ['common', 'base', 10], ['common', 'event', 53.999],
-    ['rare', 'base', 10], ['rare', 'event', 20],
-    ['exotic', 'base', 1], ['exotic', 'event', 4.5],
-    ['monster', 'base', 0.5],
-    ['eventHidden', 'event', 0.001],
-  ] } };
+  // 开放时间：month = 每年这个月（0 起算）；或 from / to = 一次性的时间段（毫秒，UTC）
+  // first：第一次开放的时间（之前预览钓到的不在图鉴显示）；skin：有节日装；snow：用飘雪代替下雨；music：BGM（默认用节日自己的歌单）
+  // notice：开放后第一次进游戏弹的通知；bye：活动结束时的提示
+  const EVENTS = {
+    xmas: { id: 'xmas', cn: '圣诞', btn: '圣诞', month: 11, when: '每年 12 月', first: Date.UTC(2026, 10, 30, 16), skin: true, snow: true, rainy: '大雪', color: '#c8322f',
+      notice: ['圣诞限定钓场开放啦！', n => `12 月 1 日 – 12 月 31 日限时开放\n${n} 种圣诞限定可钓物，还有神秘的限定隐藏等你来钓\n顶栏点「圣诞」就能进去`], bye: '圣诞限定场已经结束，明年 12 月见～',
+      table: [
+        ['common', 'base', 10], ['common', 'event', 53.999],
+        ['rare', 'base', 10], ['rare', 'event', 20],
+        ['exotic', 'base', 1], ['exotic', 'event', 4.5],
+        ['monster', 'base', 0.5],
+        ['eventHidden', 'event', 0.001],
+      ] },
+    // 感恩节：2026-11-26 00:00 – 11-28 24:00（UTC+8），只开 3 天；没有节日装、没有限定隐藏，BGM 用秋天的
+    thanks: { off: true, id: 'thanks', cn: '感恩节', btn: '感恩节', from: Date.UTC(2026, 10, 25, 16), to: Date.UTC(2026, 10, 28, 16), when: '2026 年 11 月 26 – 28 日', first: Date.UTC(2026, 10, 25, 16), music: 'autumn', rainy: '雨', color: '#c0601a',
+      notice: ['感恩节限定钓场开放啦！', n => `11 月 26 日 – 11 月 28 日，只开 3 天\n${n} 种感恩节限定可钓物等你来钓\n顶栏点「感恩节」就能进去`], bye: '感恩节限定场已经结束啦，谢谢来玩～',
+      table: [
+        ['common', 'base', 10], ['common', 'event', 54],
+        ['rare', 'base', 10], ['rare', 'event', 20],
+        ['exotic', 'base', 1], ['exotic', 'event', 4.5],
+        ['monster', 'base', 0.5],
+      ] },
+  };
   // 圣诞限定可钓物介绍（对照批次 11（重新生成版）、12 的图写）
   const EVENT_DESC = {
     candycane: '红白斜条纹的小鱼，连鳍和尾巴都是条纹的，像一根会游泳的拐杖糖。',
@@ -326,6 +342,32 @@
     ['exotic', 'snowowlfish', '雪鸮鱼'],
     ['eventHidden', 'santa', '圣诞老爷爷'],
   ].map(([rarity, id, name]) => ({ id: 'xmas_' + id, name, rarity, water: 'xmas', season: null, weather: null, event: 'xmas', file: 'xmas_' + id, desc: EVENT_DESC[id] }));
+  // 感恩节限定：普通 15 · 稀有 5 · 奇珍异兽 3（批次 15）
+  EVENT_FISH.push(...[
+    ['common', 'pumpkin', '南瓜鱼', '圆滚滚的橙色南瓜鱼，头顶的小藤蔓一游就卷一下。'],
+    ['common', 'corn', '玉米鱼', '身体是一根金黄的玉米棒，绿色的玉米叶当鳍。'],
+    ['common', 'cranberry', '蔓越莓鱼', '亮红色的小圆鱼，像一颗刚摘下的蔓越莓，酸酸甜甜。'],
+    ['common', 'applepie', '苹果派鱼', '背上是格子花纹的酥皮，闻起来有肉桂苹果的香味。'],
+    ['common', 'acorn', '橡果鱼', '戴着橡果帽的小胖鱼，松鼠最爱追着它跑。'],
+    ['common', 'sweetpotato', '红薯鱼', '烤得软软的红薯鱼，裂口冒着热气，甜得流蜜。'],
+    ['common', 'roll', '面包卷鱼', '金黄蓬松的面包卷鱼，表面刷了一层亮亮的黄油。'],
+    ['common', 'gourd', '葫芦瓜鱼', '黄绿条纹的小葫芦瓜，摆在餐桌上当装饰正好。'],
+    ['common', 'apple', '红苹果鱼', '红彤彤的苹果鱼，头顶一片小叶子当背鳍。'],
+    ['common', 'chestnut', '栗子鱼', '刚烤好的栗子鱼，裂开的小口露出金黄的果肉。'],
+    ['common', 'wheat', '麦穗鱼', '一束金色麦穗扎成的鱼，象征今年大丰收。'],
+    ['common', 'mashed', '土豆泥鱼', '软绵绵的土豆泥鱼，头顶一块黄油正慢慢化开。'],
+    ['common', 'pecanpie', '碧根果派鱼', '背上排满碧根果的焦糖派，亮晶晶的很黏牙。'],
+    ['common', 'cider', '苹果酒鱼', '暖呼呼的苹果酒鱼，插着一根肉桂棒，冒着香气。'],
+    ['common', 'honey', '蜂蜜罐鱼', '圆肚子的蜂蜜罐鱼，一游就滴下金黄的蜂蜜。'],
+    ['rare', 'turkey', '火鸡鱼', '屁股上开着一大把彩色火鸡尾羽，走路……不，游起来一摇一摆。'],
+    ['rare', 'cornucopia', '丰收号角鱼', '编织的丰收号角，里面装满水果蔬菜，永远倒不完。'],
+    ['rare', 'pilgrimhat', '朝圣帽鱼', '戴着黑色高帽、金色帽扣的小绅士鱼，很讲礼貌。'],
+    ['rare', 'roast', '烤火鸡大餐鱼', '一整只烤得金黄的火鸡大餐，配着香草和蔓越莓。'],
+    ['rare', 'scarecrow', '稻草人鱼', '穿格子衬衫、戴草帽的稻草人鱼，其实一点都不吓人。'],
+    ['exotic', 'goldenturkey', '金羽火鸡', '全身金羽的神火鸡，尾羽一展开，整片湖都被照亮。'],
+    ['exotic', 'harvestmoon', '丰收月灵鱼', '背着一轮橙色丰收满月的灵鱼，只在感恩节的夜里出现。'],
+    ['exotic', 'wheatdragon', '麦穗龙', '用金色麦穗编成的小龙，飞过的田地都会大丰收。'],
+  ].map(([rarity, id, name, desc]) => ({ id: 'thanks_' + id, name, rarity, water: 'thanks', season: null, weather: null, event: 'thanks', file: 'thanks_' + id, desc })));
 
   const data = { SEASONS, SEASON_CN, WEATHER_CN, WATER_CN, RARITY, RARITY_ORDER, FISH, ACHIEVEMENTS, EVENTS, EVENT_FISH };
   if (typeof module !== 'undefined' && module.exports) module.exports = data;

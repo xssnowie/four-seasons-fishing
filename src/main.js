@@ -102,9 +102,9 @@
   }
   // 登录的账号还没选过角色，就把这台设备上选的带进账号
   window.Store.onChange(S => { if (S.user && !okChar(S.save.char) && localChar()) setChar(localChar()); });
-  // 节日限定场：12 月自动开放；?event=xmas 可以提前预览
-  const xmasOn = () => Q.get('event') === 'xmas' || L.eventActive('xmas');
-  const XMAS_FIRST = Date.UTC(2026, 10, 30, 16); // 第一次开放：2026-12-01 00:00（UTC+8）
+  // 节日限定场：按 EVENTS 里的时间自动开放；本机测试时 ?event=xmas / ?event=thanks 可以提前预览
+  const evOn = id => Q.get('event') === id || L.eventActive(id);
+  const activeEvents = () => Object.keys(D.EVENTS).filter(evOn);
   let SKIN = null; // 当前场景的节日皮肤（在圣诞场 = 'xmas'）
   const pkey = pose => {
     const male = getChar() === 'male';
@@ -166,7 +166,7 @@
   function fmtW(w) { return w >= 1000 ? (w / 1000).toFixed(2) + ' 吨' : w.toFixed(2) + ' kg'; }
   function mmss(ms) { const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, p2 = n => String(n).padStart(2, '0'); return (h ? h + ':' + p2(m) : m) + ':' + p2(s % 60); }
   function sceneLabel(sc) {
-    if (D.EVENTS[sc.water]) return `${D.WATER_CN[sc.water]} · ${sc.weather === 'rainy' ? '大雪' : '晴'}`; // 节日场不分季节
+    if (D.EVENTS[sc.water]) return `${D.WATER_CN[sc.water]} · ${sc.weather === 'rainy' ? D.EVENTS[sc.water].rainy : '晴'}`; // 节日场不分季节
     return `${D.SEASON_CN[sc.season]} · ${D.WEATHER_CN[sc.weather]} · ${D.WATER_CN[sc.water]}`;
   }
   function condText(f) {
@@ -444,7 +444,7 @@
   // 节日场素材（可钓物 + 皮肤）进场才下载，不拖慢首次打开；缺图用占位
   function ensureEvent(scene, ev, cb, onSkin) { // cb：全部到齐；onSkin：圣诞装到了（先换装，不等鱼图）
     const list = D.EVENT_FISH.filter(f => f.event === ev).map(f => ['fish_' + f.id, `assets/event/${ev}/fish/${f.file}.png`]);
-    ['female', 'male'].forEach(g => ['idle', 'cast', 'wait', 'reel', 'celebrate'].forEach(k => list.push([`player_${ev}_${g}_${k}`, `assets/event/${ev}/player_${g}/${k}.png`])));
+    if (D.EVENTS[ev].skin) ['female', 'male'].forEach(g => ['idle', 'cast', 'wait', 'reel', 'celebrate'].forEach(k => list.push([`player_${ev}_${g}_${k}`, `assets/event/${ev}/player_${g}/${k}.png`])));
     const fillMissing = () => D.EVENT_FISH.filter(f => f.event === ev).forEach(f => { const k = 'fish_' + f.id; if (!scene.textures.exists(k)) { if (f.rarity === 'eventHidden') makeFairy(scene, k, 'winter'); else makeFish(scene, k, f); } });
     if (list.every(([k]) => scene.textures.exists(k))) { fillMissing(); if (onSkin) onSkin(); if (cb) cb(); return; }
     // 先下圣诞装（马上要用），鱼图后下（钓到才用），免得几十张图一起抢网速
@@ -544,7 +544,7 @@
       this.playerHome = null; // 转屏重排时布局变了，默认站位要重新取
       this.save = window.Store.save; // 同一个对象：登录 / 云端合并时原地更新
       this.water = (() => { try { return localStorage.getItem('fishing.water') || 'sea'; } catch (e) { return 'sea'; } })();
-      if (D.EVENTS[this.water] && !xmasOn()) this.water = 'sea'; // 活动结束了，回到海边
+      if (D.EVENTS[this.water] && !evOn(this.water)) this.water = 'sea'; // 活动结束了，回到海边
       this.sc = currentScene(this.water);
       this.state = 'idle';
       this.overlay = null;
@@ -631,17 +631,17 @@
       this.clockText = TB(this, tx + 2, Lx.P ? 74 : 62, '', Lx.P ? 26 : 22, '#ffe9c4', { stroke: '#3a2410', strokeThickness: 4 }).setDepth(d + 1);
       const mk = (x, y, w, h, label, fn, sec) => button(this, x, y, w, h, label, fn, { secondary: sec, size: 30 }).setDepth(d + 1);
       if (Lx.P) {
-        const ex = xmasOn(), y = 172, bw = ex ? 162 : 196, step = ex ? 174 : 209, x0 = 22 + bw / 2; // 圣诞场开放时多一个按钮，整排缩窄
+        const evs = activeEvents(), y = 172, step = Math.floor(1045 / (5 + evs.length)), bw = step - 12, x0 = 22 + bw / 2; // 节日场开放时多按钮，整排缩窄
         this.waterBtns = { sea: mk(x0, y, bw, 84, '海边', () => this.switchWater('sea'), true), river: mk(x0 + step, y, bw, 84, '河边', () => this.switchWater('river'), true) };
         let i = 2;
-        if (ex) this.waterBtns.xmas = mk(x0 + step * i++, y, bw, 84, '圣诞', () => this.switchWater('xmas'), true);
+        evs.forEach(id => { this.waterBtns[id] = mk(x0 + step * i++, y, bw, 84, D.EVENTS[id].btn, () => this.switchWater(id), true); });
         mk(x0 + step * i++, y, bw, 84, '图鉴', () => this.openBook());
         mk(x0 + step * i++, y, bw, 84, '成就', () => this.openAch());
         mk(x0 + step * i++, y, bw, 84, '榜单', () => this.openRank());
         this.muteBtn = this.soundButton(W - Math.max(70, orn + 40), 66, 96, mk);
       } else {
-        const ex = xmasOn(), r = Math.max(0, orn - 40); // r：给右边救生圈让位
-        const waters = [['sea', '海边'], ['river', '河边']].concat(ex ? [['xmas', '圣诞']] : []);
+        const evs = activeEvents(), ex = evs.length > 0, r = Math.max(0, orn - 40); // r：给右边救生圈让位
+        const waters = [['sea', '海边'], ['river', '河边']].concat(evs.map(id => [id, D.EVENTS[id].btn]));
         const tools = [['图鉴', () => this.openBook()], ['成就', () => this.openAch()], ['成就榜', () => this.openRank()]];
         let wb = ex ? 150 : 170, ws = ex ? 165 : 190, wx = ex ? 720 : 760, tb = 170, tx = W - 660 - r, ts = 190;
         if (wx + ws * (waters.length - 1) + wb / 2 + 20 > tx - tb / 2) { // 窄横屏（如 4:3 平板）放不下：整排按钮在标题右边平均排开
@@ -693,7 +693,7 @@
       const sh = Math.ceil(s.nextSeasonIn / 3600000), sd = Math.floor(sh / 24); // 2 天一季，精确到小时
       this.clockText.setText(`下次变天 ${mmss(s.nextWeatherIn)} · 换季还有 ${sd ? sd + ' 天 ' : ''}${sh % 24 || !sd ? (sh % 24) + ' 小时' : ''}`.trim());
       if (s.season !== this.sc.season || s.weather !== this.sc.weather) { this.sc = s; this.applyScene(false); }
-      if (D.EVENTS[this.water] && !xmasOn() && this.state === 'idle') { this.switchWater('sea'); this.flash('圣诞限定场已经结束，明年 12 月见～'); }
+      if (D.EVENTS[this.water] && !evOn(this.water) && this.state === 'idle') { const bye = D.EVENTS[this.water].bye; this.switchWater('sea'); this.flash(bye); }
     }
 
     // 竖屏：人物站到当前背景的码头 / 岸上（横屏的背景都在同一位置有码头，不用换）
@@ -712,7 +712,8 @@
     applyScene(first) {
       this.sc.water = this.water;
       const ev = D.EVENTS[this.water] ? this.water : null;
-      SKIN = ev; // 圣诞场自动换圣诞装，回到海边 / 河边换回来
+      const E = ev && D.EVENTS[ev];
+      SKIN = E && E.skin ? ev : null; // 圣诞场自动换圣诞装，回到海边 / 河边换回来；感恩节没有节日装
       if (this.player) this.player.setTexture(pkey(poseName(this.player.texture.key)));
       this.placePlayer();
       const key = this.bgKey();
@@ -720,37 +721,40 @@
       ensureBg(this, key, () => { skin(); if (!this.bg.scene || this.bgKey() !== key) return; this.bg.setTexture(key).setVisible(true); this.bg.setScale(bgMap(this.Lx, this.bg.texture).s); }); // 背景先下，节日素材排在后面
       const pre = this.Lx.P ? 'bgp' : 'bg'; // 预下载其他钓场的背景
       ['sea', 'river'].filter(w => w !== this.water).forEach(w => prefetchBg(this, `${pre}_${this.sc.season}_${w}`));
-      if (xmasOn() && !D.EVENTS[this.water]) prefetchBg(this, `${pre}_event_xmas`);
+      activeEvents().filter(id => id !== this.water).forEach(id => prefetchBg(this, `${pre}_event_${id}`));
       const rainy = this.sc.weather === 'rainy';
       this.dim.setFillStyle(0x1a2a3a, rainy ? 0.28 : 0);
-      if (rainy && !ev) this.rain.start(); else this.rain.stop();
-      if (ev) { this.snow.setFrequency(rainy ? 30 : 90, rainy ? 2 : 1); this.snow.start(); } else this.snow.stop();
-      A.setRain(rainy && !ev);
-      const song = ev || this.sc.season; // 圣诞场放圣诞 BGM
+      const snowy = !!(E && E.snow); // 圣诞场：下雪代替下雨
+      if (rainy && !snowy) this.rain.start(); else this.rain.stop();
+      if (snowy) { this.snow.setFrequency(rainy ? 30 : 90, rainy ? 2 : 1); this.snow.start(); } else this.snow.stop();
+      A.setRain(rainy && !snowy);
+      const song = E ? (E.music || ev) : this.sc.season; // 圣诞场放圣诞 BGM；感恩节放秋天的
       if (this.musicSeason !== song) { this.musicSeason = song; A.startMusic(song); }
       this.refreshHud();
       if (!first) this.flash(`天气变了：${sceneLabel(this.sc)}`);
     }
 
-    // 圣诞场开放后第一次进游戏：弹通知（每台设备每年一次，点掉才算看过）
+    // 节日场开放后第一次进游戏：弹通知（每台设备每个活动每年一次，点掉才算看过）
     eventNotice() {
-      if (!xmasOn() || this.overlay || this.state !== 'idle') return;
-      const k = 'fishing.notice.xmas.' + new Date(L.now() + 8 * 3600000).getUTCFullYear();
-      try { if (localStorage.getItem(k)) return; } catch (e) { return; }
+      if (this.overlay || this.state !== 'idle') return;
+      const year = new Date(L.now() + 8 * 3600000).getUTCFullYear(), seenKey = id => `fishing.notice.${id}.${year}`;
+      let id;
+      try { id = activeEvents().find(x => !localStorage.getItem(seenKey(x))); } catch (e) { return; }
+      if (!id) return;
+      const E = D.EVENTS[id], k = seenKey(id), fishes = D.EVENT_FISH.filter(f => f.event === id);
       const seen = () => { try { localStorage.setItem(k, String(Date.now())); } catch (e) { /* ignore */ } };
       const P = this.Lx.P, W = this.Lx.W, pw = P ? 940 : 1100, ph = P ? 1000 : 820;
       const o = this.openOverlay(pw, ph, 'ui_panel', seen);
       this.overlayKind = 'notice';
       const cy = this.Lx.oy, top = cy - ph / 2;
-      o.add(T(this, W / 2, top + 110, '圣诞限定钓场开放啦！', P ? 60 : 64, '#c8322f').setOrigin(0.5));
+      o.add(T(this, W / 2, top + 110, E.notice[0], P ? 60 : 64, E.color).setOrigin(0.5));
       const pics = this.add.container(0, 0); o.add(pics);
-      const show = () => { if (this.overlay !== o) return; pics.removeAll(true); ['xmas_candycane', 'xmas_gingerbread', 'xmas_bell'].forEach((id, i) => pics.add(fit(this.add.image(W / 2 + (i - 1) * 250, top + 330, 'fish_' + id), 230, 200))); };
-      ensureEvent(this, 'xmas', show);
-      const total = D.EVENT_FISH.filter(f => f.event === 'xmas').length;
-      o.add(TB(this, W / 2, top + 470, `12 月 1 日 – 12 月 31 日限时开放\n${total} 种圣诞限定可钓物，还有神秘的限定隐藏等你来钓\n顶栏点「圣诞」就能进去`, P ? 34 : 36, INK, { align: 'center', lineSpacing: 16, wordWrap: { width: pw - 140, useAdvancedWrap: true } }).setOrigin(0.5, 0));
+      const show = () => { if (this.overlay !== o) return; pics.removeAll(true); fishes.slice(0, 3).forEach((f, i) => pics.add(fit(this.add.image(W / 2 + (i - 1) * 250, top + 330, 'fish_' + f.id), 230, 200))); };
+      ensureEvent(this, id, show);
+      o.add(TB(this, W / 2, top + 470, E.notice[1](fishes.length), P ? 34 : 36, INK, { align: 'center', lineSpacing: 16, wordWrap: { width: pw - 140, useAdvancedWrap: true } }).setOrigin(0.5, 0));
       const by = cy + ph / 2 - (P ? 150 : 130);
       o.add(button(this, W / 2 - 200, by, 340, 100, '稍后再说', () => this.closeOverlay(), { secondary: true, size: 36 }));
-      o.add(button(this, W / 2 + 200, by, 340, 100, '马上去钓', () => { this.closeOverlay(); this.switchWater('xmas'); }, { size: 36 }));
+      o.add(button(this, W / 2 + 200, by, 340, 100, '马上去钓', () => { this.closeOverlay(); this.switchWater(id); }, { size: 36 }));
     }
 
     switchWater(w) {
@@ -763,7 +767,7 @@
     }
 
     ripple() {
-      if (this.sc.weather !== 'rainy' || D.EVENTS[this.water]) return;
+      if (this.sc.weather !== 'rainy' || (D.EVENTS[this.water] && D.EVENTS[this.water].snow)) return;
       const Lx = this.Lx;
       let x, y;
       if (this.winterRiver()) { const h = this.iceHole(); x = h.x + Phaser.Math.Between(-80, 80); y = h.y + Phaser.Math.Between(-18, 18); }
@@ -1088,21 +1092,23 @@
       tab = tab || 'sea'; page = page || 0;
       const b = this.sheet(), o = b.o, P = this.Lx.P, W = this.Lx.W;
       // 节日限定页签：活动期间，或已经钓到过限定物才显示；不算进 99 种
-      const showX = xmasOn() || (L.now() >= XMAS_FIRST && D.EVENT_FISH.some(f => this.save.book[f.id])); // 开放前不显示（之前预览钓到的也不显示）
-      if (tab === 'xmas' && !showX) tab = 'sea';
-      const xList = D.EVENT_FISH.filter(f => f.event === 'xmas');
-      // 进圣诞页签时补下载限定图：还没下载完就先画，下载完自动重画一次（之前会显示成缺图的黑框）
-      if (tab === 'xmas' && D.EVENT_FISH.some(f => !this.textures.exists('fish_' + f.id))) {
-        const o0 = b.o; ensureEvent(this, 'xmas', () => { if (this.overlay === o0) this.openBook('xmas', page); });
+      const evList = id => D.EVENT_FISH.filter(f => f.event === id);
+      const evTabs = Object.keys(D.EVENTS).filter(id => evOn(id) || (L.now() >= D.EVENTS[id].first && evList(id).some(f => this.save.book[f.id]))); // 开放前不显示（之前预览钓到的也不显示）
+      if (D.EVENTS[tab] && !evTabs.includes(tab)) tab = 'sea';
+      const isEv = !!D.EVENTS[tab], xList = isEv ? evList(tab) : [];
+      // 进节日页签时补下载限定图：还没下载完就先画，下载完自动重画一次（之前会显示成缺图的黑框）
+      if (isEv && xList.some(f => !this.textures.exists('fish_' + f.id))) {
+        const o0 = b.o, t0 = tab; ensureEvent(this, t0, () => { if (this.overlay === o0) this.openBook(t0, page); });
       }
-      const found = tab === 'xmas' ? xList.filter(f => this.save.book[f.id]).length : D.FISH.filter(f => this.save.book[f.id]).length;
-      o.add(T(this, b.left + 50, b.top + 30, tab === 'xmas' ? `圣诞限定  ${found} / ${xList.length}` : `图鉴  ${found} / ${D.FISH.length}`, 48, INK));
+      const found = isEv ? xList.filter(f => this.save.book[f.id]).length : D.FISH.filter(f => this.save.book[f.id]).length;
+      o.add(T(this, b.left + 50, b.top + 30, isEv ? `${D.EVENTS[tab].cn}限定  ${found} / ${xList.length}` : `图鉴  ${found} / ${D.FISH.length}`, 48, INK));
       const TABS = [['sea', '普通·海', f => f.rarity === 'common' && f.water === 'sea'], ['river', '普通·河', f => f.rarity === 'common' && f.water === 'river'],
         ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·隐藏', f => f.rarity === 'monster' || f.rarity === 'fairy' || f.rarity === 'goddess']];
-      if (showX) TABS.push(['xmas', '圣诞限定', f => f.event === 'xmas']);
+      evTabs.forEach(id => TABS.push([id, D.EVENTS[id].cn + (P && evTabs.length > 1 ? '' : '限定'), f => f.event === id]));
+      const showX = evTabs.length > 0;
       const tstep = Math.min(P ? 192 : 250, (b.w - 60) / TABS.length), tw = tstep - 10, ty = b.top + (P ? 128 : 112); // 页签按面板宽度平分，不会超出
       TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openBook(id), { secondary: id !== tab, size: P ? (showX ? 24 : 28) : 30 })));
-      const list = (tab === 'xmas' ? xList : D.FISH).filter(TABS.find(t => t[0] === tab)[2]);
+      const list = (isEv ? xList : D.FISH).filter(TABS.find(t => t[0] === tab)[2]);
       const cw = 164, ch = 190, sx = 183, sy = 200;
       const cols = Math.max(1, Math.floor((b.w - 60) / sx));
       const gridTop = ty + (P ? 60 : 52), footer = P ? 210 : 90;

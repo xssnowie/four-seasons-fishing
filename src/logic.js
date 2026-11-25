@@ -28,10 +28,12 @@
   }
 
   // ---------- 抽鱼 ----------
-  // 节日限定场：12 月（UTC+8）才开放
+  // 节日限定场：圣诞每年 12 月（UTC+8）；感恩节这类一次性活动按 from – to 时间段
   function eventActive(id, now) {
-    const ev = D.EVENTS[id]; if (!ev) return false;
-    return new Date((now == null ? api.now() : now) + 8 * HOUR).getUTCMonth() === ev.month;
+    const ev = D.EVENTS[id]; if (!ev || ev.off) return false; // off：素材还没到，先不开
+    const t = now == null ? api.now() : now;
+    if (ev.from != null) return t >= ev.from && t < ev.to;
+    return new Date(t + 8 * HOUR).getUTCMonth() === ev.month;
   }
 
   // 某一类可钓物在当前场景的鱼池。限定场里 src='base' 是普通场的鱼（海、河都算，跟季节天气），'event' 是限定物
