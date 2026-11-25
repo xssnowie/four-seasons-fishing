@@ -196,7 +196,7 @@
         ['eventHidden', 'event', 0.001],
       ] },
     // 感恩节：2026-11-26 00:00 – 11-28 24:00（UTC+8），只开 3 天；没有节日装、没有限定隐藏，BGM 用秋天的
-    thanks: { off: true, id: 'thanks', cn: '感恩节', btn: '感恩节', from: Date.UTC(2026, 10, 25, 16), to: Date.UTC(2026, 10, 28, 16), when: '2026 年 11 月 26 – 28 日', first: Date.UTC(2026, 10, 25, 16), music: 'autumn', rainy: '雨', color: '#c0601a',
+    thanks: { id: 'thanks', cn: '感恩节', btn: '感恩节', from: Date.UTC(2026, 10, 25, 16), to: Date.UTC(2026, 10, 28, 16), when: '2026 年 11 月 26 – 28 日', first: Date.UTC(2026, 10, 25, 16), music: 'autumn', rainy: '雨', color: '#c0601a',
       notice: ['感恩节限定钓场开放啦！', n => `11 月 26 日 – 11 月 28 日，只开 3 天\n${n} 种感恩节限定可钓物等你来钓\n顶栏点「感恩节」就能进去`], bye: '感恩节限定场已经结束啦，谢谢来玩～',
       table: [
         ['common', 'base', 10], ['common', 'event', 54],

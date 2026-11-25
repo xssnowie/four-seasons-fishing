@@ -118,11 +118,11 @@
   // 竖屏背景里人物脚踩的位置（背景图宽、高的比例），按每张图的码头 / 岸边量的
   const PLAYER_SPOT = {
     autumn_river: [0.22, 0.80], autumn_sea: [0.25, 0.88], spring_river: [0.25, 0.86], spring_sea: [0.18, 0.90],
-    summer_river: [0.18, 0.82], summer_sea: [0.22, 0.88], winter_river: [0.22, 0.94], winter_sea: [0.30, 0.93],
-    xmas: [0.45, 0.955], // 节日场不分季节，按场地取
+    summer_river: [0.18, 0.82], summer_sea: [0.22, 0.88], winter_river: [0.25, 0.80], winter_sea: [0.30, 0.93],
+    xmas: [0.45, 0.955], thanks: [0.33, 0.84], // 节日场不分季节，按场地取
   };
   // 横屏背景（1920×1080）大多在默认位置就有码头；冬天的河默认位置正好是背景里的木凳，挪到凳子右边的雪堆上
-  const PLAYER_SPOT_L = { winter_river: [0.33, 0.93], autumn_river: [0.12, 0.76] }; // 秋河重画后码头在左边木板上
+  const PLAYER_SPOT_L = { winter_river: [0.16, 0.78], autumn_river: [0.12, 0.76], thanks: [0.20, 0.80] }; // 秋河重画后码头在左边木板上
 
   // 鱼竿素材（裁边后）：握把中心对准拳头，竿尖接鱼线；rod 1449×147，rod_bent 1438×144
   const ROD_IMG = {
@@ -143,6 +143,7 @@
     autumn_sea: [0.52, 0.72, 0.80, 0.52], autumn_river: [0.45, 0.68, 0.75, 0.50],
     winter_sea: [0.50, 0.66, 0.70, 0.47],
     xmas: [0.56, 0.74, 0.86, 0.58],
+    thanks: [0.56, 0.72, 0.80, 0.52],
   };
   const LAND_P = {
     spring_sea: [0.62, 0.62, 0.78, 0.48], spring_river: [0.58, 0.62, 0.78, 0.47],
@@ -150,8 +151,9 @@
     autumn_sea: [0.60, 0.65, 0.75, 0.50], autumn_river: [0.65, 0.66, 0.75, 0.45],
     winter_sea: [0.62, 0.60, 0.75, 0.47],
     xmas: [0.62, 0.68, 0.78, 0.50],
+    thanks: [0.72, 0.62, 0.70, 0.42],
   };
-  const ICE = { landscape: [0.716, 0.722], portrait: [0.733, 0.671] }; // 冰洞在背景图里的相对位置（素材指令里写的同一位置）
+  const ICE = { landscape: [0.79, 0.625], portrait: [0.74, 0.474] }; // 冰洞在背景图里的相对位置（批次 16 重画后量的）
 
   // 多字的说明、列表、提示用圆体（猫啃网糖圆体），标题和按钮保持站酷快乐体
   function TB(scene, x, y, str, size, color, extra) { return T(scene, x, y, str, size, color, Object.assign({ fontFamily: BODY }, extra || {})); }
@@ -420,10 +422,10 @@
   }
 
   // 按需加载一张背景：先试 assets/ 里的图，没有就画占位；同时释放其他背景，手机内存吃不消
-  const BG_JPG = new Set(['autumn_river']);
+  const BG_JPG = new Set(['autumn_river', 'winter_river', 'event_thanks']);
   function bgPath(key) {
     const [kind, s, w] = key.split('_');
-    if (s === 'event') return `assets/event/${w}/${kind === 'bgp' ? 'bg_portrait' : 'bg'}.png`; // 节日场：bg_event_xmas / bgp_event_xmas
+    if (s === 'event') return `assets/event/${w}/${kind === 'bgp' ? 'bg_portrait' : 'bg'}.${BG_JPG.has('event_' + w) ? 'jpg' : 'png'}`; // 节日场：bg_event_xmas / bgp_event_xmas
     const ext = BG_JPG.has(`${s}_${w}`) ? 'jpg' : 'png'; // 重画的高清背景用 JPG（PNG 要 3MB，压成 256 色天空会有色带）
     return kind === 'bgp' ? `assets/bg/portrait/${s}_${w}.${ext}` : `assets/bg/${s}_${w}.${ext}`;
   }
