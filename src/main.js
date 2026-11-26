@@ -31,14 +31,14 @@
   function host() { const el = document.getElementById('game'); return { w: el.clientWidth || innerWidth, h: el.clientHeight || innerHeight }; }
   function computeSize() {
     const { w, h } = host();
-    if (w >= h) return { W: Math.round(Phaser.Math.Clamp(1080 * w / h, 1600, 2400)), H: 1080 };
-    return { W: 1080, H: Math.round(Phaser.Math.Clamp(1080 * h / w, 1920, 2400)) };
+    if (w >= h) return { W: Math.round(Phaser.Math.Clamp(1080 * w / h, 1600, 2600)), H: 1080 };
+    return { W: 1080, H: Math.round(Phaser.Math.Clamp(1080 * h / w, 1920, 2600)) };
   }
 
   // ---------------- 布局：所有位置都从这里取 ----------------
   function layout(W, H) {
     const P = H > W;
-    const hudH = P ? 232 : 112;
+    const hudH = P ? 390 : 112; // 竖屏顶栏下面两排大按钮
     const o = { W, H, P, hudH };
     if (P) {
       o.player = { x: 230, y: H - 190, size: 300 };
@@ -407,7 +407,8 @@
     }
     const t = T(scene, 0, -2, label, opt.size || Math.round(h * 0.42), '#ffffff', { stroke: '#6b4220', strokeThickness: 5 }).setOrigin(0.5);
     c.add(t); c.label = t;
-    c.setSize(w, h).setInteractive({ useHandCursor: true });
+    const pad = opt.pad == null ? 14 : opt.pad; // 点击范围比按钮图大一圈，手指粗也点得到
+    c.setSize(w, h).setInteractive({ hitArea: new Phaser.Geom.Rectangle(-pad, -pad, w + pad * 2, h + pad * 2), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
     c.on('pointerdown', () => { A.unlock(); A.play('click'); onClick && onClick(); });
     if (!TOUCH) { c.on('pointerover', () => c.setScale(1.05)); c.on('pointerout', () => c.setScale(1)); }
     return c;
@@ -635,13 +636,13 @@
       this.clockText = TB(this, tx + 2, Lx.P ? 74 : 62, '', Lx.P ? 26 : 22, '#ffe9c4', { stroke: '#3a2410', strokeThickness: 4 }).setDepth(d + 1);
       const mk = (x, y, w, h, label, fn, sec) => button(this, x, y, w, h, label, fn, { secondary: sec, size: 30 }).setDepth(d + 1);
       if (Lx.P) {
-        const evs = activeEvents(), y = 172, step = Math.floor(1045 / (5 + evs.length)), bw = step - 12, x0 = 22 + bw / 2; // 节日场开放时多按钮，整排缩窄
-        this.waterBtns = { sea: mk(x0, y, bw, 84, '海边', () => this.switchWater('sea'), true), river: mk(x0 + step, y, bw, 84, '河边', () => this.switchWater('river'), true) };
-        let i = 2;
-        evs.forEach(id => { this.waterBtns[id] = mk(x0 + step * i++, y, bw, 84, D.EVENTS[id].btn, () => this.switchWater(id), true); });
-        mk(x0 + step * i++, y, bw, 84, '图鉴', () => this.openBook());
-        mk(x0 + step * i++, y, bw, 84, '成就', () => this.openAch());
-        mk(x0 + step * i++, y, bw, 84, '榜单', () => this.openRank());
+        // 竖屏两排大按钮：上排钓场，下排图鉴 / 成就 / 榜单（一排挤 6 个太小，手机上点不准）
+        const big = (x, y, w, label, fn, sec) => button(this, x, y, w, 104, label, fn, { secondary: sec, size: 38, pad: 8 }).setDepth(d + 1);
+        const row = (items, y) => { const step = Math.floor(1036 / items.length), bw = step - 16; return items.map(([label, fn, sec], i) => big(22 + step * i + step / 2, y, bw, label, fn, sec)); };
+        const waters = [['sea', '海边'], ['river', '河边']].concat(activeEvents().map(id => [id, D.EVENTS[id].btn]));
+        const wb = row(waters.map(([id, label]) => [label, () => this.switchWater(id), true]), 206);
+        this.waterBtns = {}; waters.forEach(([id], i) => { this.waterBtns[id] = wb[i]; });
+        row([['图鉴', () => this.openBook()], ['成就', () => this.openAch()], ['榜单', () => this.openRank()]], 322);
         this.muteBtn = this.soundButton(W - Math.max(70, orn + 40), 66, 96, mk);
       } else {
         const evs = activeEvents(), ex = evs.length > 0, r = Math.max(0, orn - 40); // r：给右边救生圈让位
@@ -1110,8 +1111,11 @@
         ['rare', '稀有', f => f.rarity === 'rare'], ['exotic', '奇珍异兽', f => f.rarity === 'exotic'], ['monster', '怪兽·隐藏', f => f.rarity === 'monster' || f.rarity === 'fairy' || f.rarity === 'goddess']];
       evTabs.forEach(id => TABS.push([id, D.EVENTS[id].cn + (P && evTabs.length > 1 ? '' : '限定'), f => f.event === id]));
       const showX = evTabs.length > 0;
-      const tstep = Math.min(P ? 192 : 250, (b.w - 60) / TABS.length), tw = tstep - 10, ty = b.top + (P ? 128 : 112); // 页签按面板宽度平分，不会超出
-      TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openBook(id), { secondary: id !== tab, size: P ? (showX ? 24 : 28) : 30 })));
+      // 竖屏页签超过 4 个就分两排，每个页签大一点好点；横屏一排平分
+      const perRow = P && TABS.length > 4 ? Math.ceil(TABS.length / 2) : TABS.length, tabH = P ? 88 : 76;
+      const tstep = Math.min(P ? 260 : 250, (b.w - 60) / perRow), tw = tstep - 12, ty0 = b.top + (P ? 128 : 112);
+      TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + (i % perRow) * tstep, ty0 + Math.floor(i / perRow) * (tabH + 14), tw, tabH, label, () => this.openBook(id), { secondary: id !== tab, size: P ? 32 : (showX ? 28 : 30), pad: 6 })));
+      const ty = ty0 + Math.floor((TABS.length - 1) / perRow) * (tabH + 14) + (P ? 6 : 0); // 最后一排页签的位置，下面的卡片从这里往下排
       const list = (isEv ? xList : D.FISH).filter(TABS.find(t => t[0] === tab)[2]);
       const cw = 164, ch = 190, sx = 183, sy = 200;
       const cols = Math.max(1, Math.floor((b.w - 60) / sx));
@@ -1209,8 +1213,8 @@
       let y0 = b.top + 100;
       if (SS.enabled) {
         const tstep = Math.min(P ? 192 : 250, (b.w - (P ? 60 : 420)) / TABS.length), tw = tstep - 10, ty = b.top + (P ? 128 : 112); // 横屏页签停在「账号」按钮左边
-        TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, 76, label, () => this.openRank(id), { secondary: id !== tab, size: 30 })));
-        y0 = ty + 50;
+        TABS.forEach(([id, label], i) => o.add(button(this, b.left + 30 + tw / 2 + i * tstep, ty, tw, P ? 88 : 76, label, () => this.openRank(id), { secondary: id !== tab, size: P ? 32 : 30, pad: 6 })));
+        y0 = ty + (P ? 56 : 50);
       }
       if (tab === 'mine') return this.rankMine(b, o, st, byId, y0);
 
@@ -1324,11 +1328,20 @@
 
   let resizeTimer = null;
   function relayout() {
+    game.scale.getParentBounds(); // refresh() 不会自己重量容器大小，要先量，不然会按旧尺寸缩放
     const s = computeSize();
     if (s.W === game.scale.width && s.H === game.scale.height) { game.scale.refresh(); return; }
     game.scale.setGameSize(s.W, s.H);
     ['Title', 'Game'].forEach(k => { if (game.scene.isActive(k)) game.scene.getScene(k).scene.restart(); });
   }
-  window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(relayout, 200); });
+  const later = ms => { clearTimeout(resizeTimer); resizeTimer = setTimeout(relayout, ms); };
+  window.addEventListener('resize', () => later(200));
+  // iOS 主屏幕版 / App 内浏览器：开机时量到的尺寸常常不准（安全区、工具栏晚一步才算好），而且之后不一定发 resize 事件
+  // → 直接盯着游戏容器的大小，变了就重排；开机后再补查几次
+  if (window.ResizeObserver) new ResizeObserver(() => later(150)).observe(document.getElementById('game'));
+  if (window.visualViewport) visualViewport.addEventListener('resize', () => later(200));
+  window.addEventListener('pageshow', () => later(100));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) later(100); });
+  [500, 1500, 4000].forEach(ms => setTimeout(relayout, ms));
   window.addEventListener('orientationchange', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(relayout, 350); });
 })();
